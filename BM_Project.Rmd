@@ -27,6 +27,8 @@ library(Seurat)
 filename <- "C:/Users/SU084/Documents/Ghobrial/Projects/Dexa scRNAseq/Data/GL1024BM_raw_feature_bc_matrix.h5"
 BM_data.data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
 
+BM_data <- CreateSeuratObject(counts = BM_data.data, project = "BM", min.cells = 3, min.features = 200)
+
 ```
 
 # Quality Control
@@ -36,7 +38,7 @@ BM_data.data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
 BM_data[["percent.mt"]] <- PercentageFeatureSet(BM_data, pattern = "^MT-")
 
 # Visualize QC metrics as a violin plot
-VlnPlot(BM_data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+VlnPlot(BM_data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 4)
 
 ```
 
