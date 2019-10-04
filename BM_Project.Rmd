@@ -95,6 +95,11 @@ DimHeatmap(BM_data, dims = 1, cells = 500, balanced = TRUE)
 
 ```
 
+```{r}
+DimHeatmap(BM_data, dims = 1:6, cells = 500, balanced = TRUE)
+
+```
+
 
 ```{r}
 # Determine the ‘dimensionality’ of the dataset
