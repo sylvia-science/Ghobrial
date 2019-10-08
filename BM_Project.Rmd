@@ -21,17 +21,22 @@ library(dplyr)
 library(Seurat)
 ```
 
+# Run Without Filtering
 
-# Load Data
+## Load Data
 ```{r}
 filename <- "C:/Users/SU084/Documents/Ghobrial/Projects/Dexa scRNAseq/Data/GL1024BM_raw_feature_bc_matrix.h5"
-BM_data.data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
 
-BM_data <- CreateSeuratObject(counts = BM_data.data, project = "BM", min.cells = 3, min.features = 200)
+filename <- "C:/Users/Sylvia/Downloads/Ghobrial-master/GL1024BM_raw_feature_bc_matrix.h5"
+BM_raw_data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
+
+BM_data <- CreateSeuratObject(counts = BM_raw_data, project = "BM", min.cells = 3, min.features = 200)
 
 ```
 
-# Quality Control
+
+
+## Quality Control
 ```{r}
 # The [[ operator can add columns to object metadata. This is a great place to stash QC stats
 # Calculating percent Mitochondrial 
@@ -42,7 +47,7 @@ VlnPlot(BM_data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol 
 
 ```
 
-# Visualize Feature-Feature Relationships
+## Visualize Feature-Feature Relationships
 
 ```{r}
 # FeatureScatter is typically used to visualize feature-feature relationships, but can be used
@@ -54,7 +59,7 @@ CombinePlots(plots = list(plot1, plot2))
 
 ```
 
-# Identify Highly Variable Genes
+## Identify Highly Variable Genes
 ```{r}
 #Normalize
 BM_data <- NormalizeData(BM_data, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -68,18 +73,21 @@ top10
 
 ```
 
-# Scale
+## Scale
 
 ```{r}
 all.genes <- rownames(BM_data)
 BM_data <- ScaleData(BM_data, features = all.genes)
 
+```
+```{r}
+# PCA
 # Linear dimension reduction
 
 BM_data <- RunPCA(BM_data, features = VariableFeatures(object = BM_data))
 ```
 
-# PCA Results
+## PCA Results
 ```{r}
 # Examine and visualize PCA results a few different ways
 print(BM_data[["pca"]], dims = 1:5, nfeatures = 5)
@@ -101,7 +109,7 @@ DimHeatmap(BM_data, dims = 1:6, cells = 500, balanced = TRUE)
 ```
 
 
-```{r}
+```{r echo=T, results='hide'}
 # Determine the ‘dimensionality’ of the dataset
 
 # NOTE: This process can take a long time for big datasets, comment out for expediency. More
@@ -111,7 +119,7 @@ BM_data <- JackStraw(BM_data, num.replicate = 100)
 BM_data <- ScoreJackStraw(BM_data, dims = 1:20)
 ```
 
-# JackStrawPlot
+## JackStrawPlot
 ```{r}
 # The JackStrawPlot function provides a visualization tool for comparing \
 # the distribution of p-values for each PC with a uniform distribution 
@@ -123,27 +131,175 @@ JackStrawPlot(BM_data, dims = 1:15)
 
 ```
 
-# Elbow PLot
+## Elbow PLot
 ```{r}
 ElbowPlot(BM_data)
 ```
 
-# Cluster
-```{r}
+## Cluster
+```{r echo=T, results='hide'}
 # Cluster 
-BM_data <- FindNeighbors(BM_data, dims = 1:10)
-BM_data <- FindClusters(BM_data, resolution = 0.5)
-head(Idents(BM_data), 5)
+getCluster <- function(data){
+data <- FindNeighbors(data, dims = 1:10)
+data <- FindClusters(data, resolution = 0.5)
+head(Idents(data), 5)
+data <- RunUMAP(data, dims = 1:10)
+}
 
-BM_data <- RunUMAP(BM_data, dims = 1:10)
+BM_data = getCluster(BM_data)
 DimPlot(BM_data, reduction = "umap")
 ```
 
+## Find Cluster Biomarkers
+```{r echo=T, results='hide'}
+# find all markers of cluster 1
+cluster1.markers <- FindMarkers(BM_data, ident.1 = 1, min.pct = 0.25)
+head(cluster1.markers, n = 5)
+
+# find all markers distinguishing cluster 3 from clusters 0 and 2
+cluster3.markers <- FindMarkers(BM_data, ident.1 = 3, ident.2 = c(0, 2), min.pct = 0.25)
+head(cluster3.markers, n = 1)
+
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+BM_markers <- FindAllMarkers(BM_data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+BM_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+```
+
+## Plotting the top 20 markers for each cluster. 
+```{r}
+top10 <- BM_markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+DoHeatmap(BM_data, features = top10$gene) + NoLegend()
+```
+
+# Run with Filter
 
 ```{r}
+BM_data_filter <- CreateSeuratObject(counts = BM_raw_data, project = "BM", min.cells = 3, min.features = 200)
+BM_data_filter[["percent.mt"]] <- PercentageFeatureSet(BM_data_filter, pattern = "^MT-")
+BM_data_filter <- subset(BM_data_filter, subset =  nFeature_RNA > 200 & nFeature_RNA < 1500 & nCount_RNA <5000 & percent.mt < 10)
+
 ```
 
 
 ```{r}
+
+BM_data_filter[["percent.mt"]] <- PercentageFeatureSet(BM_data_filter, pattern = "^MT-")
+
+# Visualize QC metrics as a violin plot
+VlnPlot(BM_data_filter, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 4)
+
 ```
 
+## Visualize Feature-Feature Relationships
+
+```{r}
+# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
+# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
+
+plot1 <- FeatureScatter(BM_data_filter, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(BM_data_filter, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+CombinePlots(plots = list(plot1, plot2))
+
+```
+
+
+```{r}
+#Normalize
+BM_data_filter <- NormalizeData(BM_data_filter, normalization.method = "LogNormalize", scale.factor = 10000)
+
+# Identification of highly variable features
+BM_data_filter <- FindVariableFeatures(BM_data_filter, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(BM_data_filter), 10)
+top10
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(BM_data_filter)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+CombinePlots(plots = list(plot1, plot2))
+
+```
+## PCA 
+```{r echo=T, results='hide'}
+# Scale
+all.genes <- rownames(BM_data)
+BM_data_filter <- ScaleData(BM_data_filter, features = all.genes)
+
+```
+
+```{r}
+# Scale
+all.genes <- rownames(BM_data)
+BM_data_filter <- ScaleData(BM_data_filter, features = all.genes)
+
+
+# PCA
+
+BM_data_filter <- RunPCA(BM_data_filter, features = VariableFeatures(object = BM_data_filter))
+
+# Examine and visualize PCA results a few different ways
+print(BM_data_filter[["pca"]], dims = 1:5, nfeatures = 5)
+
+VizDimLoadings(BM_data_filter, dims = 1:2, reduction = "pca")
+```
+
+```{r}
+
+DimPlot(BM_data_filter, reduction = "pca")
+
+```
+
+```{r}
+DimHeatmap(BM_data_filter, dims = 1, cells = 500, balanced = TRUE)
+
+```
+
+```{r}
+DimHeatmap(BM_data_filter, dims = 1:6, cells = 500, balanced = TRUE)
+
+```
+
+```{r}
+ElbowPlot(BM_data_filter)
+```
+
+## Umap
+```{r echo=T, results='hide'}
+
+dim_list = 1:8
+BM_data_filter <- FindNeighbors(BM_data_filter, dims =dim_list)
+BM_data_filter <- FindClusters(BM_data_filter, resolution = 1.2) # use resolution above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
+
+BM_data_filter <- RunUMAP(BM_data_filter, dims = dim_list)
+
+```
+
+```{r}
+
+DimPlot(BM_data_filter, reduction = "umap")
+
+```
+
+
+## Find Cluster Biomarkers
+```{r echo=T, results='hide'}
+# find all markers of cluster 1
+#cluster1.markers <- FindMarkers(BM_data_filter, ident.1 = 1, min.pct = 0.25)
+#head(cluster1.markers, n = 5)
+
+# find all markers distinguishing cluster 2 from clusters 0 and 1
+#cluster3.markers <- FindMarkers(BM_data_filter, ident.1 = 2, ident.2 = c(0, 1), min.pct = 0.25)
+#head(cluster3.markers, n = 1)
+
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+BM_filtered_markers <- FindAllMarkers(BM_data_filter, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+```
+
+## Plotting the top 20 markers for each cluster. 
+```{r}
+top10 <- BM_filtered_markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+top10
+DoHeatmap(BM_data_filter, features = top10$gene)
+```
