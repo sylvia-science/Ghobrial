@@ -19,6 +19,7 @@ The preview shows you a rendered HTML copy of the contents of the editor. Conseq
 ```{r}
 library(dplyr)
 library(Seurat)
+library(biomaRt)
 ```
 
 # Run Without Filtering
@@ -65,7 +66,7 @@ CombinePlots(plots = list(plot1, plot2))
 BM_data <- NormalizeData(BM_data, normalization.method = "LogNormalize", scale.factor = 10000)
 
 # Identification of highly variable features
-BM_data <- FindVariableFeatures(BM_data, selection.method = "vst", nfeatures = 2000)
+BM_data <- FindVariableFeatures(BM_data, selection.method = "vst", nfeatures = 2000) 
 
 # Identify the 10 most highly variable genes
 top10 <- head(VariableFeatures(BM_data), 10)
@@ -77,7 +78,7 @@ top10
 
 ```{r}
 all.genes <- rownames(BM_data)
-BM_data <- ScaleData(BM_data, features = all.genes)
+BM_data <- ScaleData(BM_data, features = all.genes) 
 
 ```
 ```{r}
@@ -176,7 +177,7 @@ DoHeatmap(BM_data, features = top10$gene) + NoLegend()
 ```{r}
 BM_data_filter <- CreateSeuratObject(counts = BM_raw_data, project = "BM", min.cells = 3, min.features = 200)
 BM_data_filter[["percent.mt"]] <- PercentageFeatureSet(BM_data_filter, pattern = "^MT-")
-BM_data_filter <- subset(BM_data_filter, subset =  nFeature_RNA > 200 & nFeature_RNA < 1500 & nCount_RNA <5000 & percent.mt < 10)
+BM_data_filter <- subset(BM_data_filter, subset =  nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 15)
 
 ```
 
@@ -267,7 +268,7 @@ ElbowPlot(BM_data_filter)
 ## Umap
 ```{r echo=T, results='hide'}
 
-dim_list = 1:8
+dim_list = 1:10
 BM_data_filter <- FindNeighbors(BM_data_filter, dims =dim_list)
 BM_data_filter <- FindClusters(BM_data_filter, resolution = 1.2) # use resolution above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
 
@@ -294,7 +295,9 @@ DimPlot(BM_data_filter, reduction = "umap")
 
 # find markers for every cluster compared to all remaining cells, report only the positive ones
 BM_filtered_markers <- FindAllMarkers(BM_data_filter, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+#BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
+BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+
 ```
 
 ## Plotting the top 20 markers for each cluster. 
@@ -302,4 +305,60 @@ BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
 top10 <- BM_filtered_markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
 top10
 DoHeatmap(BM_data_filter, features = top10$gene)
+```
+
+```{r}
+ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+#attributes = listAttributes(ensembl)
+
+genedesc <- getBM(attributes=c('external_gene_name','description'), filters = 'external_gene_name', values = top10['gene'], mart =ensembl)
+genedesc
+
+tmp1 = genedesc['external_gene_name']
+tmp2 = top10['gene']
+
+library(dplyr)
+
+results2 = setdiff(tmp2$gene,tmp1$external_gene_name) # Not all of the gene names might be found, so the description list can be shorter than the original
+
+results2
+
+genedesc[nrow(genedesc) + 1,] = list(results2,vector("list", length(results2)))
+
+
+```
+
+
+```{r}
+genedesc
+top10$gene
+index1 <- match(genedesc$external_gene_name,top10$gene)
+genedesc$index = index1
+
+
+genedesc['order'] = 
+vector1 = genedesc$external_gene_name
+#result = genedesc[order(index1)] 
+#result = genedesc['description'][final] 
+
+result = genedesc[
+  with(genedesc, order(index1)),
+]
+
+top10['Description']= result['description']
+
+
+```
+
+
+```{r}
+dataframe <- data.frame(
+  x = c("apple", "orange", "banana", "strawberry"),
+  y = c("a", "d", "b", "c"),
+  z = c(4:1)
+)
+
+dataframe[
+  with(dataframe, order(z)),
+]
 ```
