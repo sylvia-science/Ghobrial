@@ -306,59 +306,71 @@ top10 <- BM_filtered_markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_lo
 top10
 DoHeatmap(BM_data_filter, features = top10$gene)
 ```
-
 ```{r}
 ensembl = useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
-#attributes = listAttributes(ensembl)
+attributes = listAttributes(ensembl)
+```
+
+```{r}
+
+genedesc_pheno <- getBM(attributes=c('external_gene_name','phenotype_description'), filters = 'external_gene_name', values = top10['gene'], mart =ensembl)
 
 genedesc <- getBM(attributes=c('external_gene_name','description'), filters = 'external_gene_name', values = top10['gene'], mart =ensembl)
-genedesc
 
+
+```
+
+```{r}
+# Concatonate phenotype_description into one long description for each gene
+# VERY inefficient
+genedesc$phenotype_description <- ''
+for(i in seq_len(nrow(genedesc_pheno))){
+    #print('i')
+    #print(i)
+    idx = which(genedesc$external_gene_name == genedesc_pheno$external_gene_name[i])
+    val = genedesc_pheno$phenotype_description[i]
+    #print(idx)
+    #print(val)
+    if (val!='' & genedesc['phenotype_description'][idx,] == ''){
+      genedesc['phenotype_description'][idx,] = paste(genedesc['phenotype_description'][idx,],val)
+    }
+    else if (val!='')
+    {
+      genedesc['phenotype_description'][idx,] = paste(genedesc['phenotype_description'][idx,],',',val)
+    }
+}
+```
+
+```{r}
 tmp1 = genedesc['external_gene_name']
 tmp2 = top10['gene']
 
-library(dplyr)
+result = setdiff(tmp2$gene,tmp1$external_gene_name) # Not all of the gene names might be found, so the description list can be shorter than the original
 
-results2 = setdiff(tmp2$gene,tmp1$external_gene_name) # Not all of the gene names might be found, so the description list can be shorter than the original
-
-results2
-
-genedesc[nrow(genedesc) + 1,] = list(results2,vector("list", length(results2)))
-
-
+genedesc[nrow(genedesc) + 1,] = list(result,vector("list", length(results2)))
 ```
 
 
 ```{r}
-genedesc
+#genedesc
 top10$gene
-index1 <- match(genedesc$external_gene_name,top10$gene)
-genedesc$index = index1
+index <- match(genedesc$external_gene_name,top10$gene)
+genedesc$index = index
 
 
-genedesc['order'] = 
-vector1 = genedesc$external_gene_name
-#result = genedesc[order(index1)] 
-#result = genedesc['description'][final] 
+#genedesc['order'] = 
+#vector1 = genedesc$external_gene_name
+
 
 result = genedesc[
-  with(genedesc, order(index1)),
+  with(genedesc, order(index)),
 ]
-
-top10['Description']= result['description']
+#top10['transcript_biotype']= result['transcript_biotype']
+top10['description']= result['description']
+top10['phenotype_description']= result['phenotype_description']
 
 
 ```
 
 
-```{r}
-dataframe <- data.frame(
-  x = c("apple", "orange", "banana", "strawberry"),
-  y = c("a", "d", "b", "c"),
-  z = c(4:1)
-)
 
-dataframe[
-  with(dataframe, order(z)),
-]
-```
