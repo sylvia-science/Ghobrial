@@ -37,13 +37,18 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   
   data = visualize_dim(data)
   JackStrawPlot(data, dims = 1:15)
-  ElbowPlot(data)
+  
+  plot = ElbowPlot(data)
+  pathName <- paste0(folder,'Cluster/elbow.png')
+  png(file=pathName,width=600, height=350)
+  print(plot)
+  dev.off()
   
   # Cluster with Umap
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
   data = getCluster(data,resolution_val)
-  plot = DimPlot(data, reduction = "umap")
   
+  plot = DimPlot(data, reduction = "umap")
   pathName <- paste0(folder,'Cluster/Cluster.png')
   png(file=pathName,width=600, height=350)
   print(plot)
@@ -57,7 +62,12 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   
   # Plotting the top 10 markers for each cluster.
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-  DoHeatmap(data, features = top10$gene)
+  
+  plot = DoHeatmap(data, features = top10$gene)
+  pathName <- paste0(folder,'Cluster/HeatMap.png')
+  png(file=pathName,width=1000, height=1200)
+  print(plot)
+  dev.off()
   
   
   # Get gene Descriptions
@@ -98,10 +108,8 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
   
   # Visualize QC metrics as a violin plot
   plot = VlnPlot(data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 4)
-  
-  
   pathName <- paste0(folder,'QC Metrics/violin.png')
-  png(file=pathName,width=600, height=350)
+  png(file=pathName,width=600, height=600)
   print(plot)
   dev.off()
   
@@ -166,7 +174,7 @@ visualize_PCA = function(data,folder,sample_name){
   
   plot = DimHeatmap(data, dims = 1:6, cells = 500, balanced = TRUE)
   pathName <- paste0(folder,'PCA/DimHeatMap.png')
-  png(file=pathName)
+  png(file=pathName,width=600, height=350)
   print(plot)
   dev.off()
 }
