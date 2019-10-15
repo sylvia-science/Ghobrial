@@ -2,12 +2,12 @@
 ###################
 # Functions
 ###################
-run_pipeline = function(filename,folder,sample_name,filter){
+run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   
   if (filter){
     folder <- paste0(folder,sample_name,'/Filtered/')
   }
-  else{
+  else if (filter == FALSE){
     folder <- paste0(folder,sample_name,'/Unfiltered/')
   }
   print(folder)
@@ -16,14 +16,15 @@ run_pipeline = function(filename,folder,sample_name,filter){
   
   
   data = load_data(filename)
-  nFeature_RNA_list <- list(200,2500)
-  percent_mt <- 15
+  nFeature_RNA_list <- list(sampleParam$RNA_features_min[sampleParam['Sample'] == sample_name]
+                            ,sampleParam$RNA_features_max[sampleParam['Sample'] == sample_name])
+  percent_mt <- sampleParam$percent_mt_min[sampleParam['Sample'] == 'GL1024BM']
   data = quality_control(data,filter,nFeature_RNA_list,percent_mt,folder,sample_name)
   
   #Get Variable Genes
-  norm_var <- 10000
-  nfeatures_var <- 2000
-  return_list= gene_var(data,norm_var,nfeatures_var)
+  norm_val <- sampleParam$norm_val[sampleParam['Sample'] == sample_name]
+  nfeatures_val <- sampleParam$nfeatures_val[sampleParam['Sample'] == sample_name]
+  return_list= gene_var(data,norm_val,nfeatures_val)
   data = return_list$data
   top10 = return_list$top10
   
@@ -39,7 +40,7 @@ run_pipeline = function(filename,folder,sample_name,filter){
   ElbowPlot(data)
   
   # Cluster with Umap
-  resolution_val<- 1.4
+  resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
   data = getCluster(data,resolution_val)
   plot = DimPlot(data, reduction = "umap")
   
@@ -124,12 +125,12 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
 ## Identify Highly Variable Genes
 ###################################
 
-gene_var = function(data, norm_var, nfeatures_var){
+gene_var = function(data, norm_val, nfeatures_val){
   #Normalize
-  data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = norm_var)
+  data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = norm_val)
   
   # Identification of highly variable features
-  data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_var) 
+  data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_val) 
   
   # Identify the 10 most highly variable genes
   top10 <- head(VariableFeatures(data), 10)
