@@ -9,7 +9,7 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   }else if (filter == FALSE){
     folder <- paste0(folder,sample_name,'/Unfiltered/')
   }
-  
+  print(folder)
   makeFolders(folder,sample_name)
   
   # Load data
@@ -31,15 +31,12 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   return_list= gene_var(data,norm_val,nfeatures_val)
   data = return_list$data
   top10 = return_list$top10
-  
   # Scale
   data <- ScaleData(data, features = rownames(data)) 
   
   # PCA
   data <- RunPCA(data, features = VariableFeatures(object = data))
   visualize_PCA(data,folder,sample_name)
-  
-  #browser() 
   
   data = visualize_dim(data)
   JackStrawPlot(data, dims = 1:15)
@@ -52,7 +49,7 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   
   # Cluster with Umap
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
-  
+  data <- getCluster (data,resolution_val)
   plot = DimPlot(data, reduction = "umap")
   pathName <- paste0(folder,'Cluster/Cluster.png')
   png(file=pathName,width=600, height=350)
@@ -64,7 +61,6 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
   #BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
   markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-  
   # Plotting the top 10 markers for each cluster.
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   
@@ -74,7 +70,9 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   print(plot)
   dev.off()
   
+  FeaturePlot(NL1039_post, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt"))
   
+  browser() 
   # Get gene Descriptions
   #gene_desc_top10 =  get_gene_desc(top10)
   #gene_desc_top10
