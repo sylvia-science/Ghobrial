@@ -3,22 +3,26 @@
 # Functions
 ###################
 run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
-  
+  print(sample_name)
   if (filter){
     folder <- paste0(folder,sample_name,'/Filtered/')
-  }
-  else if (filter == FALSE){
+  }else if (filter == FALSE){
     folder <- paste0(folder,sample_name,'/Unfiltered/')
   }
-  print(folder)
-  print(sample_name)
+  
   makeFolders(folder,sample_name)
   
-  
+  # Load data
+  filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+  filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+  metaData <- read_excel(filename_metaData)
+  sampleParam <- read_excel(filename_sampleParam)
   data = load_data(filename)
+  
+  # QC
   nFeature_RNA_list <- list(sampleParam$RNA_features_min[sampleParam['Sample'] == sample_name]
                             ,sampleParam$RNA_features_max[sampleParam['Sample'] == sample_name])
-  percent_mt <- sampleParam$percent_mt_min[sampleParam['Sample'] == 'GL1024BM']
+  percent_mt <- sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
   data = quality_control(data,filter,nFeature_RNA_list,percent_mt,folder,sample_name)
   
   #Get Variable Genes
@@ -35,6 +39,8 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   data <- RunPCA(data, features = VariableFeatures(object = data))
   visualize_PCA(data,folder,sample_name)
   
+  #browser() 
+  
   data = visualize_dim(data)
   JackStrawPlot(data, dims = 1:15)
   
@@ -46,7 +52,6 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   
   # Cluster with Umap
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
-  data = getCluster(data,resolution_val)
   
   plot = DimPlot(data, reduction = "umap")
   pathName <- paste0(folder,'Cluster/Cluster.png')
@@ -82,6 +87,8 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
 ################
 
 load_data <- function(filename) {
+  
+  
   
   data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
   
@@ -172,10 +179,14 @@ visualize_PCA = function(data,folder,sample_name){
   print(plot)
   dev.off()
   
-  plot = DimHeatmap(data, dims = 1:6, cells = 500, balanced = TRUE)
-  pathName <- paste0(folder,'PCA/DimHeatMap.png')
-  png(file=pathName,width=600, height=350)
-  print(plot)
+  pathName <- paste0(folder,'PCA/DimHeatMap1_6.png')
+  png(file=pathName,width=2000, height=1000, res=300)
+  print(DimHeatmap(data, dims = 1:6, cells = 500, balanced = TRUE))
+  dev.off()
+  
+  pathName <- paste0(folder,'PCA/DimHeatMap7_12.png')
+  png(file=pathName,width=2000, height=1000, res=300)
+  print(DimHeatmap(data, dims = 7:12, cells = 500, balanced = TRUE))
   dev.off()
 }
 
@@ -297,7 +308,7 @@ get_gene_desc = function(top10){
 
 
 
-get_cellType = function(data,folder,sample_name,filter){
+get_cellType = function(data,folder,sample_name,filter,markers){
   
   sample <- data
   cell_list <- list(
@@ -378,7 +389,7 @@ get_cellType = function(data,folder,sample_name,filter){
     folder <- paste0(folder,sample_name,'/Unfiltered/')
   }
   
-  markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) # Is this the entire list of genes?
 
   for(i in seq_len(length(feature_list))){
     cell_type = cell_list[i]
@@ -402,6 +413,18 @@ get_cellType = function(data,folder,sample_name,filter){
     print('')
     
   }
+  
+}
+
+label_cells = function(data,folder,sample_name,sampleParam,filter){
+    
+  new.cluster.ids2 <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name]
+  new.cluster.ids2 = unlist(strsplit(new.cluster.ids2, ", "))
+  
+  names(new.cluster.ids2) <- levels(data)
+  data <- RenameIdents(data, new.cluster.ids2)
+  DimPlot(data, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+  
   
 }
 
