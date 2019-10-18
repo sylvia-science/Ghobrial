@@ -4,13 +4,7 @@
 ###################
 run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   print(sample_name)
-  if (filter){
-    folder <- paste0(folder,sample_name,'/Filtered/')
-  }else if (filter == FALSE){
-    folder <- paste0(folder,sample_name,'/Unfiltered/')
-  }
   print(folder)
-  makeFolders(folder,sample_name)
   
   # Load data
   filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
@@ -31,6 +25,15 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   return_list= gene_var(data,norm_val,nfeatures_val)
   data = return_list$data
   top10 = return_list$top10
+  
+  #Score for Cell Cycle gene expression
+  s.genes <- cc.genes$s.genes
+  g2m.genes <- cc.genes$g2m.genes
+  if (filter){
+    data <- CellCycleScoring(data, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+  }
+  
+  
   # Scale
   data <- ScaleData(data, features = rownames(data)) 
   
@@ -49,30 +52,35 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   
   # Cluster with Umap
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
-  data <- getCluster (data,resolution_val)
-  plot = DimPlot(data, reduction = "umap")
-  pathName <- paste0(folder,'Cluster/Cluster.png')
-  png(file=pathName,width=600, height=350)
+  PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
+  
+  data <- getCluster (data,resolution_val, PCA_dim)
+  plot = DimPlot(data, reduction = "umap",label = TRUE)
+  pathName <- paste0(folder,paste0('Cluster/ClusterUmap',resolution_val,'.png'))
+  png(file=pathName,width=600, height=350,res = 100)
   print(plot)
   dev.off()
   
   # Find Cluster Biomarkers
   # find markers for every cluster compared to all remaining cells, report only the positive ones
   markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-  #BM_filtered_markers  %>% group_by(cluster) %>% top_n(n = 2, wt = avg_logFC)
   markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   # Plotting the top 10 markers for each cluster.
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   
+  #Visualize clustering
   plot = DoHeatmap(data, features = top10$gene)
   pathName <- paste0(folder,'Cluster/HeatMap.png')
   png(file=pathName,width=1000, height=1200)
   print(plot)
   dev.off()
   
-  FeaturePlot(NL1039_post, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt"))
+  #Visualize clustering
   
-  browser() 
+  pathName <- paste0(folder,'Cluster/ClusterMetrics.png')
+  png(file=pathName,width=600, height=350)
+  print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
+  dev.off()
   # Get gene Descriptions
   #gene_desc_top10 =  get_gene_desc(top10)
   #gene_desc_top10
@@ -94,6 +102,12 @@ load_data <- function(filename) {
   return (data)
 }
 
+loadRData <- function(fileName){
+  #loads an RData file, and returns it
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
 ##################
 ## Quality Control
 ##################
@@ -105,7 +119,7 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
   data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
   
   if (filter == TRUE){
-    print('hi')
+    
     print(nFeature_RNA_list)
     data <- subset(data, subset =  nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 15) # For some reason this no longer works with variables
     
@@ -171,11 +185,6 @@ visualize_PCA = function(data,folder,sample_name){
   print(plot)
   dev.off()
   
-  plot = DimPlot(data, reduction = "pca")
-  pathName <- paste0(folder,'PCA/DimPlot.png')
-  png(file=pathName,width=600, height=350)
-  print(plot)
-  dev.off()
   
   pathName <- paste0(folder,'PCA/DimHeatMap1_6.png')
   png(file=pathName,width=2000, height=1000, res=300)
@@ -213,17 +222,23 @@ visualize_dim = function(data){
 
 ## Cluster
 # Cluster 
-getCluster = function(data,resolution_val){
-  data <- FindNeighbors(data, dims = 1:10)
-  data <- FindClusters(data, resolution = resolution_val)
+getCluster = function(data,resolution_val, PCA_dim){
+  data <- FindNeighbors(data, dims = 1:PCA_dim)
+  data <- FindClusters(data, resolution = resolution_val) # Value of the resolution parameter, use a value above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
   head(Idents(data), 5)
-  data <- RunUMAP(data, dims = 1:10)
+  data <- RunUMAP(data, dims = 1:PCA_dim)
 }
 
 
 
 ## Make subfolders
-makeFolders = function(folder,sample_name){
+makeFolders = function(folder,sample_name,filter){
+  if (filter){
+    folder <- paste0(folder,sample_name,'/Filtered/')
+  }else if (filter == FALSE){
+    folder <- paste0(folder,sample_name,'/Unfiltered/')
+  }
+  
   print('here')
   print(folder)
   print(sample_name)
@@ -240,6 +255,8 @@ makeFolders = function(folder,sample_name){
   
   pathName <- paste0(folder,'Cell Type')
   dir.create( pathName, recursive = TRUE)
+  
+  return (folder)
 }
 
 
@@ -306,8 +323,8 @@ get_gene_desc = function(top10){
 
 
 
-get_cellType = function(data,folder,sample_name,filter,markers){
-  
+get_cellType = function(data,folder,sample_name,filter){
+  print(folder)
   sample <- data
   cell_list <- list(
     'bcell_activated',
@@ -380,15 +397,23 @@ get_cellType = function(data,folder,sample_name,filter,markers){
     
   )
   
-  if (filter){
-    folder <- paste0(folder,sample_name,'/Filtered/')
-  }
-  else{
-    folder <- paste0(folder,sample_name,'/Unfiltered/')
+  # Match cells with features
+  cell_features <- data.frame(cell=character(),
+                   features=character(), 
+                   stringsAsFactors=FALSE) 
+  
+  #cell_features[,'cell'] = cell_list
+
+  
+  for(i in seq_len(length(cell_list))){
+    cell_features[i,'cell'] = cell_list[i]
+    cell_features[i,'features'] = paste(unlist(feature_list[i]), collapse=", ")
+ 
   }
   
-  markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25) # Is this the entire list of genes?
-
+  
+  invisible(markers <- FindAllMarkers(data)) # Is this the entire list of genes?
+  
   for(i in seq_len(length(feature_list))){
     cell_type = cell_list[i]
     x <- unlist(feature_list[i])
