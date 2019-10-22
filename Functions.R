@@ -2,9 +2,15 @@
 ###################
 # Functions
 ###################
-run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
+run_pipeline = function(filename,folder,sample_name,sampleParam,filter,regress_TF){
   print(sample_name)
-  print(folder)
+  if (regress_TF){
+    subfolder = 'Regress/' # Save files in regression folder
+  }else{
+    subfolder = 'No_Regress/' # Save files in No regression folder
+  }
+  folder_input = paste0(folder,subfolder)
+  
   
   # Load data
   filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
@@ -17,50 +23,53 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   nFeature_RNA_list <- list(sampleParam$RNA_features_min[sampleParam['Sample'] == sample_name]
                             ,sampleParam$RNA_features_max[sampleParam['Sample'] == sample_name])
   percent_mt <- sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
-  data = quality_control(data,filter,nFeature_RNA_list,percent_mt,folder,sample_name)
+  print('hello')
+  data = quality_control(data,filter,nFeature_RNA_list,percent_mt,folder_input,sample_name)
   
   #Get Variable Genes
-  norm_val <- sampleParam$norm_val[sampleParam['Sample'] == sample_name]
   nfeatures_val <- sampleParam$nfeatures_val[sampleParam['Sample'] == sample_name]
-  return_list= gene_var(data,norm_val,nfeatures_val)
+  return_list= gene_var(data,nfeatures_val)
   data = return_list$data
   top10 = return_list$top10
   
   #Score for Cell Cycle gene expression
   s.genes <- cc.genes$s.genes
   g2m.genes <- cc.genes$g2m.genes
-  if (filter){
-    data <- CellCycleScoring(data, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
-  }
+  data <- CellCycleScoring(data, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
   
   
   # Scale
-  data <- ScaleData(data, features = rownames(data)) 
-  
+  if (regress_TF){ # Check if we need to regress out
+    # CHANGE vars.to.regress WITH VALUES FROM PARAM
+    data <- ScaleData(data, features = rownames(data), vars.to.regress = c("nCount_RNA", "percent.mt"))
+  }else{
+    data <- ScaleData(data, features = rownames(data)) 
+  }
   # PCA
-  data <- RunPCA(data, features = VariableFeatures(object = data))
-  visualize_PCA(data,folder,sample_name)
+  PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
+  data <- RunPCA(data, features = VariableFeatures(object = data), npcs = PCA_dim)
+  visualize_PCA(data,folder_input,sample_name,PCA_dim)
   
-  data = visualize_dim(data)
-  JackStrawPlot(data, dims = 1:15)
+  data = visualize_dim(data,PCA_dim)
+  #JackStrawPlot(data, dims = 1:PCA_dim)
   
-  plot = ElbowPlot(data)
-  pathName <- paste0(folder,'Cluster/elbow.png')
+  plot = ElbowPlot(data,ndims = 20)
+  print(folder_input)
+  pathName <- paste0(folder_input,'PCA/elbow.png')
   png(file=pathName,width=600, height=350)
   print(plot)
   dev.off()
   
+  
+  
   # Cluster with Umap
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
-  PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
-  
   data <- getCluster (data,resolution_val, PCA_dim)
-  plot = DimPlot(data, reduction = "umap",label = TRUE)
-  pathName <- paste0(folder,paste0('Cluster/ClusterUmap',resolution_val,'.png'))
-  png(file=pathName,width=600, height=350,res = 100)
-  print(plot)
-  dev.off()
-  
+  # Name cells
+  label_cells(data,folder_input,sample_name,sampleParam,resolution_val,filter,regress_TF)
+    
+
   # Find Cluster Biomarkers
   # find markers for every cluster compared to all remaining cells, report only the positive ones
   markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
@@ -68,22 +77,26 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
   # Plotting the top 10 markers for each cluster.
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   
-  #Visualize clustering
+  # Visualize clustering
+  # Cluster Metrics
+  pathName <- paste0(folder_input,'Cluster/ClusterMetrics.png')
+  png(file=pathName,width=600, height=350)
+  print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
+  dev.off()
+  # Cluster Labels
   plot = DoHeatmap(data, features = top10$gene)
-  pathName <- paste0(folder,'Cluster/HeatMap.png')
+  pathName <- paste0(folder_input,'Cluster/HeatMap.png')
   png(file=pathName,width=1000, height=1200)
   print(plot)
   dev.off()
   
-  #Visualize clustering
   
-  pathName <- paste0(folder,'Cluster/ClusterMetrics.png')
-  png(file=pathName,width=600, height=350)
-  print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
-  dev.off()
   # Get gene Descriptions
   #gene_desc_top10 =  get_gene_desc(top10)
   #gene_desc_top10
+  #########################################################################################
+  
+  
   return(data)
   
 }
@@ -93,9 +106,7 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter){
 ################
 
 load_data <- function(filename) {
-  
-  
-  
+
   data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
   
   data <- CreateSeuratObject(counts = data, project = "BM", min.cells = 3, min.features = 200)
@@ -128,6 +139,7 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
   # Visualize QC metrics as a violin plot
   plot = VlnPlot(data, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 4)
   pathName <- paste0(folder,'QC Metrics/violin.png')
+  print(pathName)
   png(file=pathName,width=600, height=600)
   print(plot)
   dev.off()
@@ -152,9 +164,9 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
 ## Identify Highly Variable Genes
 ###################################
 
-gene_var = function(data, norm_val, nfeatures_val){
+gene_var = function(data, nfeatures_val){
   #Normalize
-  data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = norm_val)
+  data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
   
   # Identification of highly variable features
   data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_val) 
@@ -174,7 +186,7 @@ gene_var = function(data, norm_val, nfeatures_val){
 ## PCA Results
 # Examine and visualize PCA results a few different ways
 #######################################
-visualize_PCA = function(data,folder,sample_name){
+visualize_PCA = function(data,folder,sample_name,PCA_dim){
   print(data[["pca"]], dims = 1:5, nfeatures = 5)
   
   
@@ -186,35 +198,39 @@ visualize_PCA = function(data,folder,sample_name){
   dev.off()
   
   
-  pathName <- paste0(folder,'PCA/DimHeatMap1_6.png')
+  pathName <- paste0(folder,'PCA/DimHeatMap1_5.png')
   png(file=pathName,width=2000, height=1000, res=300)
-  print(DimHeatmap(data, dims = 1:6, cells = 500, balanced = TRUE))
+  print(DimHeatmap(data, dims = 1:5, cells = 500, balanced = TRUE))
   dev.off()
   
-  pathName <- paste0(folder,'PCA/DimHeatMap7_12.png')
+  pathName <- paste0(folder,'PCA/DimHeatMap6_10.png')
   png(file=pathName,width=2000, height=1000, res=300)
-  print(DimHeatmap(data, dims = 7:12, cells = 500, balanced = TRUE))
+  print(DimHeatmap(data, dims = 6:10, cells = 500, balanced = TRUE))
   dev.off()
+  
+  for (x in 1:(PCA_dim -1)){
+    y <- x+1
+    pathName <- paste0(folder,'PCA/PCA',x,'_',y,'.png')
+    png(file=pathName,width=600, height=350)
+    print(DimPlot(data, dims = c(x,y), reduction = "pca",pt.size = 1))
+    dev.off()
+  }
+  
 }
 
 
 
 
 ## Get Visualize Dimension Data
-visualize_dim = function(data){
+visualize_dim = function(data,PCA_dim){
   # Determine the 'dimensionality' of the dataset
   
   # NOTE: This process can take a long time for big datasets, comment out for expediency. More
   # approximate techniques such as those implemented in ElbowPlot() can be used to reduce
   # computation time
-  invisible(data <- JackStraw(data, num.replicate = 100))
-  invisible(data <- ScoreJackStraw(data, dims = 1:20))
-  # The JackStrawPlot function provides a visualization tool for comparing \
-  # the distribution of p-values for each PC with a uniform distribution 
-  # (dashed line). 'Significant' PCs will show a strong enrichment of 
-  # features with low p-values (solid curve above the dashed line). In this # case it appears that there is a sharp drop-off in significance after the #first 10-12 PCs.
-  
-  
+  #invisible(data <- JackStraw(data, num.replicate = 100))
+  #invisible(data <- ScoreJackStraw(data, dims = 1:PCA_dim))
+
   
   return(data)
 }
@@ -238,22 +254,32 @@ makeFolders = function(folder,sample_name,filter){
   }else if (filter == FALSE){
     folder <- paste0(folder,sample_name,'/Unfiltered/')
   }
+
   
-  print('here')
-  print(folder)
-  print(sample_name)
+  pathName <- paste0(folder,'Regress/QC Metrics')
+  dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'QC Metrics')
+  pathName <- paste0(folder,'Regress/PCA')
+  dir.create( pathName, recursive = TRUE)
+  
+  pathName <- paste0(folder,'Regress/Cluster')
+  dir.create( pathName, recursive = TRUE)
+  
+  pathName <- paste0(folder,'Regress/Cell Type')
+  dir.create( pathName, recursive = TRUE)
+  
+  
+  pathName <- paste0(folder,'No_Regress/QC Metrics')
   print(pathName)
   dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'PCA')
+  pathName <- paste0(folder,'No_Regress/PCA')
   dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'Cluster')
+  pathName <- paste0(folder,'No_Regress/Cluster')
   dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'Cell Type')
+  pathName <- paste0(folder,'No_Regress/Cell Type')
   dir.create( pathName, recursive = TRUE)
   
   return (folder)
@@ -323,8 +349,14 @@ get_gene_desc = function(top10){
 
 
 
-get_cellType = function(data,folder,sample_name,filter){
+get_cellType = function(data,data_orig,folder,sample_name,filter){
   print(folder)
+  if (regress_TF){
+    subfolder = 'Regress/' # Save files in regression folder
+  }else{
+    subfolder = 'No_Regress/' # Save files in No regression folder
+  }
+  folder = paste0(folder,subfolder)
   sample <- data
   cell_list <- list(
     'bcell_activated',
@@ -363,7 +395,7 @@ get_cellType = function(data,folder,sample_name,filter){
   )
   feature_list <- list(
     list('CD19','IL2RA','CD30'),
-    list('CD27','CD38','SDC1','SLAMF7','IL6'),
+    list('CD27','CD38','SDC1','SLAMF7','IL6','CD138','TNFRSF17'),
     list('MS4A1','CD27','CD40','CD80','PDCD1LG2', 'CXCR3','CXCR4','CXCR5','CXCR6'),
     list('CD1A','CR2','CD37','NOTCH2'),
     list('CR2','CD22','FCER2'),
@@ -411,20 +443,23 @@ get_cellType = function(data,folder,sample_name,filter){
  
   }
   
-  
-  invisible(markers <- FindAllMarkers(data)) # Is this the entire list of genes?
-  
+  data_orig = load_data(filename)
+  all_markers  = data_orig@assays[['RNA']]
+  all_markers = all_markers@data@Dimnames[[1]]
+  #all_markers2 <- FindAllMarkers(data)
+  #browser()
   for(i in seq_len(length(feature_list))){
     cell_type = cell_list[i]
     x <- unlist(feature_list[i])
-    gene_list = (x[x %in% markers$gene])  
+    gene_list = (x[x %in% all_markers])  
     # FeaturePlot gives error if no genes are found, so we have to check if they are included in the highly variable genes
     if (length(gene_list > 0)){
       print(paste0( cell_type,': Found'))
       print(x)
-      plot = print( FeaturePlot(sample, features = c(x)))
-      
+      plot = FeaturePlot(sample, features = c(x))
+      plot = plot + labs(subtitle=cell_type) + theme(plot.subtitle = element_text(hjust=0.5, size=16))
       pathName <- paste0(folder,'Cell Type/',cell_type,'.png')
+      
       png(file=pathName)
       print(plot)
       dev.off()
@@ -438,16 +473,34 @@ get_cellType = function(data,folder,sample_name,filter){
   }
   
 }
+#################################
+## Label Clusters
+#################################
 
-label_cells = function(data,folder,sample_name,sampleParam,filter){
-    
-  new.cluster.ids2 <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name]
-  new.cluster.ids2 = unlist(strsplit(new.cluster.ids2, ", "))
+label_cells = function(data,folder,sample_name,sampleParam,resolution_val,filter,regress_TF){
   
-  names(new.cluster.ids2) <- levels(data)
-  data <- RenameIdents(data, new.cluster.ids2)
-  DimPlot(data, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+
+  if (regress_TF){
+    cluster_IDs <- sampleParam$Cluster_IDs_post_regress[sampleParam['Sample'] == sample_name]
+  }else{
+    cluster_IDs <- sampleParam$Cluster_IDs_pre_regress[sampleParam['Sample'] == sample_name]
+  }
   
+  cluster_IDs = unlist(strsplit(cluster_IDs, ", ")) # Remember to always put space after ,
+  print(cluster_IDs)
+  print(levels(data))
   
+  if (length(cluster_IDs) == length(levels(data))){
+    names(cluster_IDs) <- levels(data)
+    data <- RenameIdents(data, cluster_IDs)
+  }else{
+    print('Cluster ID length does not match number of clusters')
+  }
+  
+  print(folder)
+  pathName <- paste0(folder,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
+  png(file=pathName,width=600, height=350,res = 100)
+  print(DimPlot(data, reduction = "umap", label = TRUE, pt.size = 1))
+  dev.off()
 }
 
