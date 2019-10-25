@@ -16,12 +16,7 @@ library(ggplot2)
 
 
 
-# Load Data
-```{r}
 
-data <- loadRData(paste0(folder_input,'data.Robj'))
-
-```
 # Load Metadata and Parameter data
 ```{r}
 filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
@@ -52,7 +47,12 @@ folder_input = paste0(folder,subfolder)
 
 ```
 
+# Load Data
+```{r}
 
+data <- loadRData(paste0(folder_input,'data.Robj'))
+
+```
 # Load Metadata
 ```{r}
 metaData <- read_excel(filename_metaData)
@@ -199,7 +199,7 @@ markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   # Plotting the top 10 markers for each cluster.
 top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   
-plot = DoHeatmap(data, features = top10$gene)
+DoHeatmap(data, features = top10$gene)
 ```
 
 # Name Clusters

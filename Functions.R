@@ -2,16 +2,9 @@
 ###################
 # Functions
 ###################
-run_pipeline = function(filename,folder,sample_name,sampleParam,filter,regress_TF){
+run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,regress_TF){
   print(sample_name)
-  if (regress_TF){
-    subfolder = 'Regress/' # Save files in regression folder
-  }else{
-    subfolder = 'No_Regress/' # Save files in No regression folder
-  }
-  folder_input = paste0(folder,subfolder)
-  
-  
+
   # Load data
   filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
   filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
@@ -65,6 +58,7 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter,regress_T
   
   # Cluster with Umap
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+  print(paste0('Resolution' ,': ', resolution_val))
   data <- getCluster (data,resolution_val, PCA_dim)
   # Name cells
   label_cells(data,folder_input,sample_name,sampleParam,resolution_val,filter,regress_TF)
@@ -76,6 +70,8 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter,regress_T
   markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   # Plotting the top 10 markers for each cluster.
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+  write.csv(top10, file = paste0(folder_input,'Top10Features.csv'),row.names=FALSE)
+  #browser()
   
   # Visualize clustering
   # Cluster Metrics
@@ -85,7 +81,7 @@ run_pipeline = function(filename,folder,sample_name,sampleParam,filter,regress_T
   dev.off()
   # Cluster Labels
   plot = DoHeatmap(data, features = top10$gene)
-  pathName <- paste0(folder_input,'Cluster/HeatMap.png')
+  pathName <- paste0(folder_input,paste0('Cluster/HeatMap',resolution_val,'.png'))
   png(file=pathName,width=1000, height=1200)
   print(plot)
   dev.off()
@@ -132,7 +128,20 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
   if (filter == TRUE){
     
     print(nFeature_RNA_list)
-    data <- subset(data, subset =  nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 15) # For some reason this no longer works with variables
+    
+    print(nFeature_RNA_list[2])
+    nFeature_RNA_min = as.numeric(nFeature_RNA_list[1])
+    nFeature_RNA_max = as.numeric(nFeature_RNA_list[2])
+    #browser()
+    nFeature_RNA_tmp = 100
+    
+    # Can't use subset function because doesn't work with variables
+    # This is a workaround
+    expr <- FetchData(object = data, vars = 'nFeature_RNA')
+    data = data[, which(x = expr > nFeature_RNA_min & expr < nFeature_RNA_max)]
+    
+    expr <- FetchData(object = data, vars = 'percent.mt')
+    data = data[, which(x = expr < percent_mt)]
     
   }
   
@@ -147,10 +156,10 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
   # Visualize Feature-Feature Relationships
   # FeatureScatter is typically used to visualize feature-feature relationships, but can be used
   # for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
-  plot1 <- FeatureScatter(data, feature1 = "nCount_RNA", feature2 = "percent.mt")
-  plot2 <- FeatureScatter(data, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") 
+  plot1 <- FeatureScatter(data, feature1 = "nCount_RNA", feature2 = "percent.mt") + xlim(0, 30000) + ylim(0, 100)
+  plot2 <- FeatureScatter(data, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + xlim(0, 30000)  + ylim(0, 5000)
   plot = CombinePlots(plots = list(plot1, plot2))
-  
+
   pathName <- paste0(folder,'QC Metrics/scatter.png')
   png(file=pathName,width=600, height=350)
   print(plot)
@@ -189,30 +198,35 @@ gene_var = function(data, nfeatures_val){
 visualize_PCA = function(data,folder,sample_name,PCA_dim){
   print(data[["pca"]], dims = 1:5, nfeatures = 5)
   
-  
-  
   plot = VizDimLoadings(data, dims = 1:2, reduction = "pca")
   pathName <- paste0(folder,'PCA/DimLoading.png')
   png(file=pathName,width=600, height=350)
   print(plot)
   dev.off()
   
-  
-  pathName <- paste0(folder,'PCA/DimHeatMap1_5.png')
+  ## ADD DOTPLOT
+  pathName <- paste0(folder,'PCA/DimHeatMap1_6.png')
   png(file=pathName,width=2000, height=1000, res=300)
-  print(DimHeatmap(data, dims = 1:5, cells = 500, balanced = TRUE))
+  print(DimHeatmap(data, dims = 1:6, cells = 500, balanced = TRUE))
   dev.off()
   
-  pathName <- paste0(folder,'PCA/DimHeatMap6_10.png')
-  png(file=pathName,width=2000, height=1000, res=300)
-  print(DimHeatmap(data, dims = 6:10, cells = 500, balanced = TRUE))
-  dev.off()
-  
+  if (PCA_dim >=12){
+    pathName <- paste0(folder,'PCA/DimHeatMap7_12.png')
+    png(file=pathName,width=2000, height=1000, res=300)
+    print(DimHeatmap(data, dims = 7:12, cells = 500, balanced = TRUE))
+    dev.off()
+  }else{
+    pathName <- paste0(folder,'PCA/DimHeatMap7_12.png')
+    png(file=pathName,width=2000, height=1000, res=300)
+    print(DimHeatmap(data, dims = 7:PCA_dim, cells = 500, balanced = TRUE))
+    dev.off()
+  }
+  ## ADD DOTPLOT
   for (x in 1:(PCA_dim -1)){
     y <- x+1
     pathName <- paste0(folder,'PCA/PCA',x,'_',y,'.png')
     png(file=pathName,width=600, height=350)
-    print(DimPlot(data, dims = c(x,y), reduction = "pca",pt.size = 1))
+    print(DimPlot(data, dims = c(x,y), reduction = "pca",pt.size = 2))
     dev.off()
   }
   
@@ -242,47 +256,40 @@ getCluster = function(data,resolution_val, PCA_dim){
   data <- FindNeighbors(data, dims = 1:PCA_dim)
   data <- FindClusters(data, resolution = resolution_val) # Value of the resolution parameter, use a value above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
   head(Idents(data), 5)
+  #data <- RunTSNE(data, dims = 1:PCA_dim)
   data <- RunUMAP(data, dims = 1:PCA_dim)
 }
 
 
 
 ## Make subfolders
-makeFolders = function(folder,sample_name,filter){
+makeFolders = function(folder,sample_name,filter,regress_TF){
   if (filter){
     folder <- paste0(folder,sample_name,'/Filtered/')
   }else if (filter == FALSE){
     folder <- paste0(folder,sample_name,'/Unfiltered/')
   }
 
+  if (regress_TF){
+    subfolder = 'Regress/' # Save files in regression folder
+  }else{
+    subfolder = 'No_Regress/' # Save files in No regression folder
+  }
+  folder_input = paste0(folder,subfolder)
   
-  pathName <- paste0(folder,'Regress/QC Metrics')
+  pathName <- paste0(folder_input,'QC Metrics')
   dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'Regress/PCA')
+  pathName <- paste0(folder_input,'PCA')
   dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'Regress/Cluster')
+  pathName <- paste0(folder_input,'Cluster')
   dir.create( pathName, recursive = TRUE)
   
-  pathName <- paste0(folder,'Regress/Cell Type')
+  pathName <- paste0(folder_input,'Cell Type')
   dir.create( pathName, recursive = TRUE)
   
-  
-  pathName <- paste0(folder,'No_Regress/QC Metrics')
-  print(pathName)
-  dir.create( pathName, recursive = TRUE)
-  
-  pathName <- paste0(folder,'No_Regress/PCA')
-  dir.create( pathName, recursive = TRUE)
-  
-  pathName <- paste0(folder,'No_Regress/Cluster')
-  dir.create( pathName, recursive = TRUE)
-  
-  pathName <- paste0(folder,'No_Regress/Cell Type')
-  dir.create( pathName, recursive = TRUE)
-  
-  return (folder)
+  return (folder_input)
 }
 
 
@@ -351,12 +358,7 @@ get_gene_desc = function(top10){
 
 get_cellType = function(data,data_orig,folder,sample_name,filter){
   print(folder)
-  if (regress_TF){
-    subfolder = 'Regress/' # Save files in regression folder
-  }else{
-    subfolder = 'No_Regress/' # Save files in No regression folder
-  }
-  folder = paste0(folder,subfolder)
+
   sample <- data
   cell_list <- list(
     'bcell_activated',
@@ -433,7 +435,7 @@ get_cellType = function(data,data_orig,folder,sample_name,filter){
   cell_features <- data.frame(cell=character(),
                    features=character(), 
                    stringsAsFactors=FALSE) 
-  
+
   #cell_features[,'cell'] = cell_list
 
   
@@ -447,7 +449,6 @@ get_cellType = function(data,data_orig,folder,sample_name,filter){
   all_markers  = data_orig@assays[['RNA']]
   all_markers = all_markers@data@Dimnames[[1]]
   #all_markers2 <- FindAllMarkers(data)
-  #browser()
   for(i in seq_len(length(feature_list))){
     cell_type = cell_list[i]
     x <- unlist(feature_list[i])
@@ -456,10 +457,12 @@ get_cellType = function(data,data_orig,folder,sample_name,filter){
     if (length(gene_list > 0)){
       print(paste0( cell_type,': Found'))
       print(x)
-      plot = FeaturePlot(sample, features = c(x))
-      plot = plot + labs(subtitle=cell_type) + theme(plot.subtitle = element_text(hjust=0.5, size=16))
-      pathName <- paste0(folder,'Cell Type/',cell_type,'.png')
       
+      # Add dotplot
+      subtitle_str = paste0(cell_type,': ', toString(x))
+      plot = FeaturePlot(sample, features = c(x))
+      plot = plot + labs(subtitle=subtitle_str) + theme(plot.subtitle = element_text(hjust=0.5, size=16))
+      pathName <- paste0(folder,'Cell Type/',cell_type,'.png')
       png(file=pathName)
       print(plot)
       dev.off()
@@ -497,10 +500,13 @@ label_cells = function(data,folder,sample_name,sampleParam,resolution_val,filter
     print('Cluster ID length does not match number of clusters')
   }
   
-  print(folder)
   pathName <- paste0(folder,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
   png(file=pathName,width=600, height=350,res = 100)
   print(DimPlot(data, reduction = "umap", label = TRUE, pt.size = 1))
   dev.off()
+  #pathName <- paste0(folder,paste0('Cluster/ClusterTsne_label',resolution_val,'.png'))
+  #png(file=pathName,width=600, height=350,res = 100)
+  #print(DimPlot(data, reduction = "tsne", label = TRUE, pt.size = 1))
+  #dev.off()
 }
 
