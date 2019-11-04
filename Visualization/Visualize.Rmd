@@ -1,0 +1,136 @@
+---
+title: "Visualize ScRNA Seq"
+output: html_notebook
+---
+
+
+```{r}
+library(png)
+library(readxl)
+library(knitr)
+library(cowplot)
+library(ggplot2)
+library(magick)
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
+
+```
+
+# Get File Paths
+```{r,results="hide"}
+folder_base <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
+filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+sampleParam <- read_excel(filename_sampleParam)
+filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+metaData <- read_excel(filename_metaData)
+
+
+sample_name <- metaData$Sample[5]
+regress_TF = TRUE
+
+
+filter = TRUE
+folder_input = makeFolders(folder_base,sample_name,filter,regress_TF)
+parameters = read.csv(file=paste0(folder_input,'parameters.csv'), sep=",")
+
+# Load data
+filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+metaData <- read_excel(filename_metaData)
+sampleParam <- read_excel(filename_sampleParam)
+
+    
+```
+
+```{r}
+print(parameters)
+```
+
+# QC
+
+```{r}
+print(paste0('Sample: ',sample_name))
+print(paste0('Folder: ',folder_input))
+  
+# PCA
+pathName_scatter1 <- paste0(folder_input,'QC Metrics/scatter.png')
+
+pathName_violin1 <- paste0(folder_input,'QC Metrics/violin.png')
+
+include_graphics(c(pathName_scatter1))
+include_graphics(c(pathName_violin1))
+
+
+
+```
+
+# PCA
+
+```{r}
+# PCA
+PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
+print(paste0('PCA_dim: ',PCA_dim))
+
+pathName1 <- paste0(folder_input,'PCA/Elbow.png')
+pathName2 <- paste0(folder_input,'PCA/DimLoading.png')
+pathName3 <- paste0(folder_input,'PCA/DimHeatMap1_6.png')
+pathName4 <- paste0(folder_input,'PCA/DimHeatMap7_12.png')
+
+include_graphics(pathName1)
+include_graphics(pathName2)
+include_graphics(pathName3)
+include_graphics(pathName4)
+
+
+ 
+```
+
+# PCA Individual Plots
+
+```{r}
+pathlist =  vector()
+for (x in 1:(PCA_dim -1)){
+  y <- x+1
+  pathName <- paste0(folder_input,'PCA/PCA',x,'_',y,'.png')
+  print(include_graphics((pathName)))
+}
+
+```
+# Cluster Metrics
+
+```{r}
+resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+print(paste0('Resolution: ',resolution_val))
+
+pathName1 <- paste0(folder_input,paste0('Cluster/ClusterMetrics','.png'))
+
+include_graphics(pathName1)
+
+
+```
+
+# Cluster with Umap
+
+```{r}
+resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+print(paste0('Resolution: ',resolution_val))
+
+pathName1 <- paste0(folder_input,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
+pathName3 <- paste0(folder_input,paste0('Cluster/HeatMap','.png'))
+
+include_graphics(pathName1)
+include_graphics(pathName3)
+
+```
+
+# Cell Labeling
+```{r}
+
+pathName1 <- paste0(folder_input,paste0('Cell Type/'))
+cell_images<-list.files(pathName1, pattern = ".png", full.names = TRUE)
+
+for (x in cell_images){
+  print(include_graphics(x))
+}
+
+
+```
