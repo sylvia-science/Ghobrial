@@ -4,13 +4,24 @@
 ###################
 run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,regress_TF){
   print(sample_name)
-
+  
+  cluster_IDs = sampleParam$Cluster_IDs_post_regress[sampleParam['Sample'] == sample_name]
+  # if (cluster_IDs == 'tmp'){
+  #   file_str = ''
+  # }else
+  # {
+  #   file_str = '_label'
+  # }
+  file_str = ''
   # Load data
   filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
   filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
   metaData <- read_excel(filename_metaData)
   sampleParam <- read_excel(filename_sampleParam)
   data = load_data(filename)
+  
+  cell_features_file <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Cell_IDS.xlsx'
+  cell_features <- read_excel(cell_features_file)
   
   # QC
   nFeature_RNA_list <- list(sampleParam$RNA_features_min[sampleParam['Sample'] == sample_name]
@@ -47,11 +58,10 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   data = visualize_dim(data,PCA_dim)
   #JackStrawPlot(data, dims = 1:PCA_dim)
   
-  plot = ElbowPlot(data,ndims = 20)
   print(folder_input)
-  pathName <- paste0(folder_input,'PCA/elbow.png')
+  pathName <- paste0(folder_input,'PCA/elbow_',PCA_dim,'.png')
   png(file=pathName,width=600, height=350)
-  print(plot)
+  print(ElbowPlot(data,ndims = PCA_dim))
   dev.off()
   
   
@@ -60,18 +70,48 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
   print(paste0('Resolution' ,': ', resolution_val))
   data <- getCluster (data,resolution_val, PCA_dim)
+  
   # Name cells
-  label_cells(data,folder_input,sample_name,sampleParam,resolution_val,filter,regress_TF)
-    
-
+  #data = label_cells(data,folder_input,sample_name,sampleParam,resolution_val,filter,regress_TF, file_str)
+  
+  
+  
   # Find Cluster Biomarkers
+  print('Find Cluster Biomarkers')
   # find markers for every cluster compared to all remaining cells, report only the positive ones
   markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
   markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   # Plotting the top 10 markers for each cluster.
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-  write.csv(top10, file = paste0(folder_input,'Top10Features.csv'),row.names=FALSE)
+  top20 <- markers %>% group_by(cluster) %>% top_n(n = 20, wt = avg_logFC)
+  
+  top20$Cell = NA
+  # Add known markers to top20
   #browser()
+  
+  for (i in 1:nrow(top20)){
+    marker_rows = grep(top20$gene[i], cell_features$Markers, value=TRUE)
+    marker_idx = which( cell_features$Markers %in% marker_rows)
+    #browser()
+    if (length(marker_idx) > 0){
+      #browser()
+      cell_list = cell_features$Cell[marker_idx]
+      cell_list = paste(cell_list, sep="", collapse=", ") 
+      top20$Cell[i] = cell_list
+    }else if (length(marker_idx) == 0 ){
+      top20$Cell[i] = ''
+    }
+  }
+  
+  
+  
+  write.csv(top20, file = paste0(folder_input,'Top20Features',file_str,'.csv'),row.names=FALSE)
+  #browser()
+  # Plot Umap
+  pathName <- paste0(folder_input,paste0('Cluster/ClusterUmap',resolution_val,file_str,'.png'))
+  png(file=pathName,width=600, height=350, res = 100)
+  print(DimPlot(data, reduction = "umap",label = TRUE,pt.size = 1))
+  dev.off()
   
   # Visualize clustering
   # Cluster Metrics
@@ -79,9 +119,9 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   png(file=pathName,width=600, height=350)
   print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
   dev.off()
-  # Cluster Labels
+  # Cluster Heatmap
   plot = DoHeatmap(data, features = top10$gene)
-  pathName <- paste0(folder_input,paste0('Cluster/HeatMap',resolution_val,'.png'))
+  pathName <- paste0(folder_input,paste0('Cluster/HeatMap',resolution_val,file_str,'.png'))
   png(file=pathName,width=1000, height=1200)
   print(plot)
   dev.off()
@@ -102,7 +142,7 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
 ################
 
 load_data <- function(filename) {
-
+  print(filename)
   data <- Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
   
   data <- CreateSeuratObject(counts = data, project = "BM", min.cells = 3, min.features = 200)
@@ -176,9 +216,8 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,folder,samp
 gene_var = function(data, nfeatures_val){
   #Normalize
   data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
-  
   # Identification of highly variable features
-  data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_val) 
+  data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_val*2) 
   
   # Identify the 10 most highly variable genes
   top10 <- head(VariableFeatures(data), 10)
@@ -196,6 +235,7 @@ gene_var = function(data, nfeatures_val){
 # Examine and visualize PCA results a few different ways
 #######################################
 visualize_PCA = function(data,folder,sample_name,PCA_dim){
+  print('Visualize PCA')
   print(data[["pca"]], dims = 1:5, nfeatures = 5)
   
   plot = VizDimLoadings(data, dims = 1:2, reduction = "pca")
@@ -253,6 +293,7 @@ visualize_dim = function(data,PCA_dim){
 ## Cluster
 # Cluster 
 getCluster = function(data,resolution_val, PCA_dim){
+  print('Get Cluster')
   data <- FindNeighbors(data, dims = 1:PCA_dim)
   data <- FindClusters(data, resolution = resolution_val) # Value of the resolution parameter, use a value above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
   head(Idents(data), 5)
@@ -263,7 +304,8 @@ getCluster = function(data,resolution_val, PCA_dim){
 
 
 ## Make subfolders
-makeFolders = function(folder,sample_name,filter,regress_TF){
+makeFolders = function(folder,sample_name,filter,regress_TF,makeFolder_TF){
+  print('Make Folders')
   if (filter){
     folder <- paste0(folder,sample_name,'/Filtered/')
   }else if (filter == FALSE){
@@ -276,19 +318,21 @@ makeFolders = function(folder,sample_name,filter,regress_TF){
     subfolder = 'No_Regress/' # Save files in No regression folder
   }
   folder_input = paste0(folder,subfolder)
-  
-  pathName <- paste0(folder_input,'QC Metrics')
-  dir.create( pathName, recursive = TRUE)
-  
-  pathName <- paste0(folder_input,'PCA')
-  dir.create( pathName, recursive = TRUE)
-  
-  pathName <- paste0(folder_input,'Cluster')
-  dir.create( pathName, recursive = TRUE)
-  
-  pathName <- paste0(folder_input,'Cell Type')
-  dir.create( pathName, recursive = TRUE)
-  
+  print(folder)
+  print(folder_input)
+  if (makeFolder_TF){
+    pathName <- paste0(folder_input,'QC Metrics')
+    dir.create( pathName, recursive = TRUE)
+    
+    pathName <- paste0(folder_input,'PCA')
+    dir.create( pathName, recursive = TRUE)
+    
+    pathName <- paste0(folder_input,'Cluster')
+    dir.create( pathName, recursive = TRUE)
+    
+    pathName <- paste0(folder_input,'Cell Type')
+    dir.create( pathName, recursive = TRUE)
+  }
   return (folder_input)
 }
 
@@ -356,46 +400,52 @@ get_gene_desc = function(top10){
 
 
 
-get_cellType = function(data,data_orig,folder,sample_name,filter){
+get_cellType = function(data,data_orig,folder,sample_name){
+  
   print(folder)
 
   sample <- data
-  cell_list <- list(
-    'bcell_activated',
-    'bcell_plasma',
-    'bcell_memory',
-    'bcell_marginal',
-    'bcell_follicular',
-    'bcell_regulatory',
-    'tcell_general',
-    'tcell_activated',
-    'tcell_effector',
-    'tcell_regulatory',
-    'tcell_exhausted',
-    'tcell_helper_1',
-    'tcell_helper_2',
-    'tcell_naive',
-    'tcell_cytotoxic',
-    'tcell_memory',
-    'tcell_helper_17',
-    'monocyte_inflammatory',
-    'monocyte_resident',
-    'monocyte_CD14',
-    'monocyte_FCGR3A',
-    'macrophages',
-    'nk_cell',
-    'DC',
-    'pDC',
-    'megakaryocyte',
-    'erythrocyte',
-    'neutrophil',
-    'eosionophil',
-    'basophil',
-    'mast',
-    'hsc'
-    
-  )
-  feature_list <- list(
+  
+  cell_features_file <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Cell_IDS.xlsx'
+  cell_features <- read_excel(cell_features_file)
+  
+  # cell_list <- list(
+  #   'bcell_activated',
+  #   'bcell_plasma',
+  #   'bcell_memory',
+  #   'bcell_marginal',
+  #   'bcell_follicular',
+  #   'bcell_regulatory',
+  #   'tcell_general',
+  #   'tcell_activated',
+  #   'tcell_effector',
+  #   'tcell_regulatory',
+  #   'tcell_exhausted',
+  #   'tcell_helper_1',
+  #   'tcell_helper_2',
+  #   'tcell_naive',
+  #   'tcell_cytotoxic',
+  #   'tcell_memory',
+  #   'tcell_helper_17',
+  #   'monocyte_inflammatory',
+  #   'monocyte_resident',
+  #   'monocyte_CD14',
+  #   'monocyte_FCGR3A',
+  #   'macrophages',
+  #   'nk_cell',
+  #   'DC', # Add MZB1
+  #   'pDC',
+  #   'megakaryocyte',
+  #   'erythrocyte',
+  #   'neutrophil',
+  #   'eosionophil',
+  #   'basophil',
+  #   'mast',
+  #   'hsc'
+  #   
+  # )
+  
+  feature_list_old <- list(
     list('CD19','IL2RA','CD30'),
     list('CD27','CD38','SDC1','SLAMF7','IL6','CD138','TNFRSF17'),
     list('MS4A1','CD27','CD40','CD80','PDCD1LG2', 'CXCR3','CXCR4','CXCR5','CXCR6'),
@@ -419,7 +469,7 @@ get_cellType = function(data,data_orig,folder,sample_name,filter){
     list('CD14','FCGR3A','MS4A7'),
     list('CD68','CCR5','TFRC','ITGAM','FCGR1A','CSF1R','MRC1','CD163'),
     list('NKG7','GNLY','NCR1','KLRD1','NCAM1'),
-    list('FCER1A', 'ITGAX', 'CD83', 'THBD','CD209','CD1C', 'LYZ'),
+    list('FCER1A', 'ITGAX', 'CD83', 'THBD','CD209','CD1C', 'LYZ', 'MZB1'),
     list('IL3RA','CLEC4C','NRP1'),
     list('PPBP', 'ITGA2B','GP9', 'GP1BA', 'ITGB3'),
     list('GYPA', 'BLVRB', 'HBB', 'HBA1'),
@@ -428,30 +478,36 @@ get_cellType = function(data,data_orig,folder,sample_name,filter){
     list('IL3RA', 'ENPP3'),
     list('KIT','CD33','TPSAB1', 'CD9'),
     list('CD34','THY1', 'CDK6')
-    
+
   )
-  
+
   # Match cells with features
-  cell_features <- data.frame(cell=character(),
-                   features=character(), 
-                   stringsAsFactors=FALSE) 
-
-  #cell_features[,'cell'] = cell_list
-
+  # cell_features <- data.frame(cell=character(),
+  #                  features=character(),
+  #                  stringsAsFactors=FALSE)
+  # 
+  # #cell_features[,'cell'] = cell_list
+  # 
+  # 
+  # for(i in seq_len(length(cell_list))){
+  #   cell_features[i,'cell'] = cell_list[i]
+  #   cell_features[i,'features'] = paste(unlist(feature_list[i]), collapse=", ")
+  # 
+  # }
+  cell_list = cell_features$Cell
+  feature_list = cell_features$Markers
   
-  for(i in seq_len(length(cell_list))){
-    cell_features[i,'cell'] = cell_list[i]
-    cell_features[i,'features'] = paste(unlist(feature_list[i]), collapse=", ")
- 
-  }
-  
-  data_orig = load_data(filename)
   all_markers  = data_orig@assays[['RNA']]
   all_markers = all_markers@data@Dimnames[[1]]
   #all_markers2 <- FindAllMarkers(data)
   for(i in seq_len(length(feature_list))){
     cell_type = cell_list[i]
-    x <- unlist(feature_list[i])
+    x_old <- unlist(feature_list_old[i])
+    
+
+    x = unlist(strsplit(feature_list[i], ",")) 
+    x = gsub("\\s", "", x)  
+    
     gene_list = (x[x %in% all_markers])  
     # FeaturePlot gives error if no genes are found, so we have to check if they are included in the highly variable genes
     if (length(gene_list > 0)){
@@ -480,14 +536,15 @@ get_cellType = function(data,data_orig,folder,sample_name,filter){
 ## Label Clusters
 #################################
 
-label_cells = function(data,folder,sample_name,sampleParam,resolution_val,filter,regress_TF){
+label_cells = function(data,sample_name,sampleParam){
   
-
+  
   if (regress_TF){
     cluster_IDs <- sampleParam$Cluster_IDs_post_regress[sampleParam['Sample'] == sample_name]
   }else{
     cluster_IDs <- sampleParam$Cluster_IDs_pre_regress[sampleParam['Sample'] == sample_name]
   }
+  
   
   cluster_IDs = unlist(strsplit(cluster_IDs, ", ")) # Remember to always put space after ,
   print(cluster_IDs)
@@ -496,17 +553,92 @@ label_cells = function(data,folder,sample_name,sampleParam,resolution_val,filter
   if (length(cluster_IDs) == length(levels(data))){
     names(cluster_IDs) <- levels(data)
     data <- RenameIdents(data, cluster_IDs)
+    label = '_label'
   }else{
     print('Cluster ID length does not match number of clusters')
   }
   
-  pathName <- paste0(folder,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
-  png(file=pathName,width=600, height=350,res = 100)
-  print(DimPlot(data, reduction = "umap", label = TRUE, pt.size = 1))
-  dev.off()
-  #pathName <- paste0(folder,paste0('Cluster/ClusterTsne_label',resolution_val,'.png'))
-  #png(file=pathName,width=600, height=350,res = 100)
-  #print(DimPlot(data, reduction = "tsne", label = TRUE, pt.size = 1))
-  #dev.off()
+  
+  return ((data))
 }
 
+###################
+## Diff Expression
+###################
+
+diff_exp = function(data_input, cell_type){
+  #Add active.ident to the metadata and convert to dataframe
+  data_input@meta.data$active.ident <- data_input@active.ident
+  data_permute <- data.frame(data_input@meta.data)
+  
+  #Calculate difference in cell proportion, following permutation of sample labels 10,000 times
+  permuted_differences <- replicate(10000, {
+    all <- sample(data_input$orig.ident)
+    newPre <- which(all == "data_pre")
+    newPost <- which(all == "data_post")
+    diff <- (sum(data_permute$active.ident[newPost] %in% cell_type)/length(newPost)) 
+    - (sum(data_permute$active.ident[newPre] %in% cell_type)/length(newPre))
+    return(diff)
+  })
+  
+  #What's the proportion of differences that were larger than the observed difference?
+  obsdiff <- (sum(data_permute$active.ident[which(data_permute$orig.ident == "data_post")] 
+                  %in% cell_type)/sum(data_permute$orig.ident == "data_post")) 
+  - (sum(data_permute$active.ident[which(data_permute$orig.ident == "data_pre")] 
+         %in% cell_type)/sum(data_permute$orig.ident == "data_pre"))
+  
+  
+  output = (sum(abs(permuted_differences) > abs(obsdiff)) + 1) / (length(permuted_differences) + 1)
+  return (output)
+  
+}
+
+diff_exp_helper = function(data, folder_pre,sample_name,cell_type_list){
+  
+  # Load and merge original data
+  
+  df_expr <- data.frame(matrix(ncol = 2, nrow = length(cell_type_list)))
+  colnames(df_expr) <- c("cell_type", "DE")
+  df_expr$cell_type = cell_type_list
+  for (i in 1:length(cell_type_list))
+  {
+    diff_exp_result = diff_exp(data,cell_type_list[i] )
+    print(paste0(cell_type_list[i], ' diff_exp_result: ', diff_exp_result))
+    df_expr$DE[i] = diff_exp_result
+  
+    
+  }
+  return (df_expr)
+  
+}
+
+
+diffExpGene = function(data, folder_pre,sample_name,cell_type_list){
+  
+  # Load and merge original data
+  
+  cell_marker_list = list()
+
+  for (i in 1:length(cell_type_list))
+  {
+    
+    celltype.condition = data@meta.data[["celltype.condition"]]
+    pre_sum = sum(celltype.condition == paste0(cell_type_list[i],'_pre'))
+    post_sum = sum(celltype.condition == paste0(cell_type_list[i],'_post'))
+    
+    if (pre_sum > 3 & post_sum > 3){
+      
+      cell_markers <- FindMarkers(data, ident.1 = paste0(cell_type_list[i],'_post'), ident.2 = paste0(cell_type_list[i],'_pre'), verbose = FALSE)
+      #browser()
+      cell_markers['Cell'] =cell_type_list[i]
+      setDT(cell_markers, keep.rownames = 'Gene')
+      
+      
+      cell_marker_list = rbind(cell_marker_list,cell_markers)
+    }
+    
+    
+  }
+  return (cell_marker_list)
+  
+}
