@@ -25,7 +25,7 @@ filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Roman
 metaData <- read_excel(filename_metaData)
 
 
-sample_name <- metaData$Sample[21]
+sample_name <- metaData$Sample[31]
 regress_TF = FALSE
 
 
@@ -148,11 +148,11 @@ print(plot_grid(p1, p2))
 resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
 print(paste0('Resolution: ',resolution_val))
 
-pathName1_nofilter <- paste0(folder_nofilter,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
-pathName1_filter <- paste0(folder_filter,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
+pathName1_nofilter <- paste0(folder_nofilter,paste0('Cluster/ClusterUmap',resolution_val,'.png'))
+pathName1_filter <- paste0(folder_filter,paste0('Cluster/ClusterUmap',resolution_val,'.png'))
 
-pathName2_nofilter <- paste0(folder_nofilter,paste0('Cluster/HeatMap','.png'))
-pathName2_filter <- paste0(folder_filter,paste0('Cluster/HeatMap','.png'))
+pathName2_nofilter <- paste0(folder_nofilter,paste0('Cluster/HeatMap',resolution_val,'.png'))
+pathName2_filter <- paste0(folder_filter,paste0('Cluster/HeatMap',resolution_val,'.png'))
 
 p1 <- ggdraw() + draw_image(pathName1_nofilter, scale = 1)
 p2 <- ggdraw() + draw_image(pathName1_filter, scale = 1)

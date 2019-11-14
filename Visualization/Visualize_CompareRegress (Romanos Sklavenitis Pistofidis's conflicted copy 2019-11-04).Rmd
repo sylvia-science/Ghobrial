@@ -1,0 +1,177 @@
+---
+title: "Compare Regression"
+output: html_notebook
+---
+
+
+
+```{r}
+library(png)
+library(readxl)
+library(knitr)
+library(cowplot)
+library(ggplot2)
+library(magick)
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
+
+```
+
+# Get File Paths
+```{r,results="hide"}
+folder_base <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
+filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+sampleParam <- read_excel(filename_sampleParam)
+filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+metaData <- read_excel(filename_metaData)
+
+
+sample_name <- metaData$Sample[22]
+filter = TRUE
+
+regress_TF = FALSE
+folder_noregress = makeFolders(folder_base,sample_name,filter,regress_TF, FALSE)
+regress_TF = TRUE
+folder_regress = makeFolders(folder_base,sample_name,filter,regress_TF, FALSE)
+#parameters = read.csv(file=paste0(folder_regress,'parameters.csv'), sep=",")
+
+# Load data
+filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+metaData <- read_excel(filename_metaData)
+sampleParam <- read_excel(filename_sampleParam)
+
+    
+```
+
+```{r}
+print(parameters)
+```
+
+```{r}
+print(paste0('Sample: ',sample_name))
+print(paste0('Folder Filter: ',folder_regress))
+```
+
+# QC
+
+```{r}
+
+# PCA
+pathName_scatter1 <- paste0(folder_noregress,'QC Metrics/scatter.png')
+pathName_scatter2 <- paste0(folder_regress,'QC Metrics/scatter.png')
+
+pathName_violin1 <- paste0(folder_noregress,'QC Metrics/violin.png')
+pathName_violin2 <- paste0(folder_regress,'QC Metrics/violin.png')
+
+include_graphics((pathName_scatter1))
+include_graphics((pathName_violin1))
+#include_graphics(c(pathName_violin1,pathName_violin2))
+
+#1 <- ggdraw() + draw_image(pathName_violin1, scale = 1.2)
+#p2 <- ggdraw() + draw_image(pathName_violin2, scale = 1.2)
+#plot_grid(p1, p2)
+
+```
+
+# PCA 
+
+```{r}
+# PCA
+PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
+print(paste0('PCA_dim: ',PCA_dim))
+
+pathName_filter1 <- paste0(folder_regress,'PCA/Elbow.png')
+pathName_filter2 <- paste0(folder_regress,'PCA/DimLoading.png')
+pathName_filter3 <- paste0(folder_regress,'PCA/DimHeatMap1_6.png')
+pathName_filter4 <- paste0(folder_regress,'PCA/DimHeatMap7_12.png')
+
+pathName_nofilter1 <- paste0(folder_noregress,'PCA/Elbow.png')
+pathName_nofilter2 <- paste0(folder_noregress,'PCA/DimLoading.png')
+pathName_nofilter3 <- paste0(folder_noregress,'PCA/DimHeatMap1_6.png')
+pathName_nofilter4 <- paste0(folder_noregress,'PCA/DimHeatMap7_12.png')
+
+p1 <- ggdraw() + draw_image(pathName_filter2, scale = 1)
+p2 <- ggdraw() + draw_image(pathName_nofilter2, scale = 1)
+plot_grid(p1, p2)
+
+include_graphics(c(pathName_filter3,pathName_nofilter3))
+
+include_graphics(c(pathName_filter4,pathName_nofilter4))
+
+
+
+ 
+```
+
+# PCA Individual Plots
+
+```{r}
+pathlist =  vector()
+for (x in 1:(PCA_dim -1)){
+  y <- x+1
+  pathName_nofilter <- paste0(folder_noregress,'PCA/PCA',x,'_',y,'.png')
+  pathName_filter <- paste0(folder_regress,'PCA/PCA',x,'_',y,'.png')
+
+  p1 <- ggdraw() + draw_image(pathName_nofilter, scale = 1)
+  p2 <- ggdraw() + draw_image(pathName_filter, scale = 1)
+  print(plot_grid(p1, p2))
+}
+
+```
+# Cluster Metrics
+
+```{r}
+resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+print(paste0('Resolution: ',resolution_val))
+
+pathName_nofilter <- paste0(folder_noregress,paste0('Cluster/ClusterMetrics','.png'))
+pathName_filter <- paste0(folder_regress,paste0('Cluster/ClusterMetrics','.png'))
+
+p1 <- ggdraw() + draw_image(pathName_nofilter, scale = 1)
+p2 <- ggdraw() + draw_image(pathName_filter, scale = 1)
+print(plot_grid(p1, p2))
+
+```
+
+# Cluster with Umap
+
+```{r}
+resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+print(paste0('Resolution: ',resolution_val))
+
+pathName1_nofilter <- paste0(folder_noregress,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
+pathName1_filter <- paste0(folder_regress,paste0('Cluster/ClusterUmap_label',resolution_val,'.png'))
+
+pathName2_nofilter <- paste0(folder_noregress,paste0('Cluster/HeatMap',resolution_val,'.png'))
+pathName2_filter <- paste0(folder_regress,paste0('Cluster/HeatMap',resolution_val,'.png'))
+
+p1 <- ggdraw() + draw_image(pathName1_nofilter, scale = 1)
+p2 <- ggdraw() + draw_image(pathName1_filter, scale = 1)
+print(plot_grid(p1, p2))
+
+p1 <- ggdraw() + draw_image(pathName2_nofilter, scale = 1)
+p2 <- ggdraw() + draw_image(pathName2_filter, scale = 1)
+print(plot_grid(p1, p2))
+
+```
+
+# Cell Labeling
+```{r}
+
+pathName_nofilter <- paste0(folder_noregress,paste0('Cell Type/'))
+cell_images_nofilter<-list.files(pathName_nofilter, pattern = ".png", full.names = TRUE)
+
+pathName_filter <- paste0(folder_regress,paste0('Cell Type/'))
+cell_image_filter<-list.files(pathName_filter, pattern = ".png", full.names = TRUE)
+
+
+for (x in 1:length(cell_images_nofilter)){
+  p1 <- ggdraw() + draw_image((cell_images_nofilter[x]), scale = 1)
+  p2 <- ggdraw() + draw_image((cell_image_filter[x]), scale = 1)
+  print(plot_grid(p1, p2))
+
+  #print(include_graphics(x))
+}
+
+
+```
