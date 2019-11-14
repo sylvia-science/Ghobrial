@@ -1,0 +1,240 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+# Libraries
+
+library(dplyr)
+library(Seurat)
+library(readxl)
+
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
+
+```
+
+# Load Data
+```{r}
+filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+metaData <- read_excel(filename_metaData)
+sampleParam <- read_excel(filename_sampleParam)
+
+folder_base <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
+
+filter <- TRUE
+regress_TF <- TRUE
+
+# Pre
+sample_name_pre <- metaData$Sample[3]
+folder = makeFolders(folder_base,sample_name_pre,filter,regress_TF, FALSE)
+data_pre <- loadRData(paste0(folder,'data.Robj'))
+data_pre@meta.data$data_pre_renamed <- data_pre@active.ident
+
+# Post
+sample_name_post <- metaData$Sample[4]
+folder = makeFolders(folder_base,sample_name_post,filter,regress_TF, FALSE)
+data_post = loadRData(paste0(folder,'data.Robj'))
+data_post@meta.data$data_post_renamed <- data_post@active.ident
+
+```
+
+#Calculate integration anchors
+```{r}
+
+data_pre@meta.data$orig.ident <- "data_pre"
+data_post@meta.data$orig.ident <- "data_post"
+
+data_pre@meta.data$data_pre_renamed <- data_pre@active.ident
+data_post@meta.data$data_post_renamed <- data_post@active.ident
+
+
+anchors <- FindIntegrationAnchors(object.list = list(data_pre, data_post))
+
+#Integrate samples
+data_integrated <- IntegrateData(anchorset = anchors)
+```
+  
+```{r}
+#Score for cell cycle genes
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+data_integrated <- CellCycleScoring(data_integrated, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+data_integrated <- ScaleData(data_integrated, features = rownames(data))
+
+data_integrated <- RunPCA(data_integrated, features = VariableFeatures(object =data_integrated), npcs = 15)
+```
+
+```{r}
+#Visualize PCA results
+npcs <- 15
+for (x in 1:(npcs -1)){
+  y <- x+1
+  print(DimPlot(data_integrated, dims = c(x,y), reduction = "pca"))
+}
+
+DimHeatmap(data_integrated, dims = c(1:15), cells = 500, balanced = T)
+
+ElbowPlot(data_integrated, ndims = 30)
+
+```
+
+```{r}
+# Find Neighbors and Clusters
+data_integrated <- FindNeighbors(data_integrated, dims = 1:15)
+data_integrated <- FindClusters(data_integrated, resolution = 1)
+
+#Visualize clustering
+data_integrated = RunUMAP(data_integrated, dims = 1:15, max_iter = 2000)
+
+```
+
+```{r}
+DimPlot(data_integrated, label=T, repel=F, reduction = "umap")
+
+```
+
+```{r}
+DimPlot(data_integrated, label=T, repel=F, reduction = "umap", split.by = "orig.ident")
+
+```
+
+```{r}
+FeaturePlot(data_integrated, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt"))
+
+```
+```{r}
+
+
+```
+
+
+```{r}
+DimPlot(data_integrated, label=T, repel=F, reduction = "umap", group.by = "data_pre_renamed", split.by = "orig.ident")
+
+```
+
+```{r}
+DimPlot(data_integrated, label=T, repel=F, reduction = "umap", group.by = "data_post_renamed", split.by = "orig.ident")
+
+```
+```{r}
+
+  sample <- data_integrated
+  cell_list <- list(
+    'bcell_activated',
+    'bcell_plasma',
+    'bcell_memory',
+    'bcell_marginal',
+    'bcell_follicular',
+    'bcell_regulatory',
+    'tcell_general',
+    'tcell_activated',
+    'tcell_effector',
+    'tcell_regulatory',
+    'tcell_exhausted',
+    'tcell_helper_1',
+    'tcell_helper_2',
+    'tcell_naive',
+    'tcell_cytotoxic',
+    'tcell_memory',
+    'tcell_helper_17',
+    'monocyte_inflammatory',
+    'monocyte_resident',
+    'monocyte_CD14',
+    'monocyte_FCGR3A',
+    'macrophages',
+    'nk_cell',
+    'DC',
+    'pDC',
+    'megakaryocyte',
+    'erythrocyte',
+    'neutrophil',
+    'eosionophil',
+    'basophil',
+    'mast',
+    'hsc'
+
+  )
+  feature_list <- list(
+    list('CD19','IL2RA','CD30'),
+    list('CD27','CD38','SDC1','SLAMF7','IL6'),
+    list('MS4A1','CD27','CD40','CD80','PDCD1LG2', 'CXCR3','CXCR4','CXCR5','CXCR6'),
+    list('CD1A','CR2','CD37','NOTCH2'),
+    list('CR2','CD22','FCER2'),
+    list('CD1A','CD5','CR2','CD24','TLR4','IL10','TGFB1'),
+    list('CD3D','CD3E','CD3G','PTPRC'),
+    list('CD69','IL2RA'),
+    list('CD3D','B3GAT1','PDCD1','FAS','CCR7'),
+    list('CD4','IL2RA','FOXP3','SMAD3','STAT5A','STAT5B','IL10'),
+    list('CD3D','PDCD1','FAS','CCR7','SELL','LAG3','HAVCR2','TIGIT','ENTPD1'),
+    list('CD4','CXCR3','TBX21','STAT1','STAT6','IFNG'),
+    list('CD4','CCR4','PTGDR2','GATA3','STAT5','STAT6','IL4','IL5','IL13'),
+    list('IL7R','S100A4','CD3D','SELL','CD27'),
+    list('CD8A', 'CD8B'),
+    list('IL7R','CD3D','CCR7','SELL'),
+    list('CD4','CCR6','RORC','RORA','STAT3','IL17A','IL17F'),
+    list('CCR2'),
+    list('CXCR1'),
+    list('CD14', 'FCN1', 'LYZ'),
+    list('CD14','FCGR3A','MS4A7'),
+    list('CD68','CCR5','TFRC','ITGAM','FCGR1A','CSF1R','MRC1','CD163'),
+    list('NKG7','GNLY','NCR1','KLRD1','NCAM1'),
+    list('FCER1A', 'ITGAX', 'CD83', 'THBD','CD209','CD1C', 'LYZ'),
+    list('IL3RA','CLEC4C','NRP1'),
+    list('PPBP', 'ITGA2B','GP9', 'GP1BA', 'ITGB3'),
+    list('GYPA', 'BLVRB', 'HBB', 'HBA1'),
+    list('FUT4','ITGAM','FCGR3A','ITGB2','FCGR2A','CD44','CD55'),
+    list('IL5RA','CCR3','EMR1','ADGRE1','SIGLEC8'),
+    list('IL3RA', 'ENPP3'),
+    list('KIT','CD33','TPSAB1', 'CD9'),
+    list('CD34','THY1', 'CDK6')
+
+  )
+
+  invisible(markers <- FindAllMarkers(data_integrated))
+
+  for(i in seq_len(length(feature_list))){
+    cell_type = cell_list[i]
+    x <- unlist(feature_list[i])
+    gene_list = (x[x %in% markers$gene])
+    # FeaturePlot gives error if no genes are found, so we have to check if they are included 
+    if (length(gene_list > 0)){
+      print(paste0( cell_type,': Found'))
+      print(x)
+      plot = FeaturePlot(sample, features = c(x))
+      plot = plot + labs(subtitle=cell_type) + theme(plot.subtitle = element_text(hjust=0.5, size=16))
+
+      print(plot)
+
+    }else {
+      print(paste0( cell_type,': Not Found'))
+      print(x)
+    }
+    print('')
+
+  }
+```
+
+```{r}
+
+folder <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
+
+
+folder_input <- paste0(folder,sample_name_pre,'/')
+
+save(data_integrated,file=paste0(folder_input,sample_name_pre,'_',sample_name_post,'_integration.Robj'))
+
+```
+
+
+```{r}
+loadRData <- function(fileName){
+#loads an RData file, and returns it
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+```
+
