@@ -179,6 +179,7 @@ data <- FindClusters(data, resolution = resolution_val)
 head(Idents(data), 5)
 data <- RunUMAP(data, dims = 1:PCA_dim)
 
+print(data[["umap"]], dims = 1:5, nfeatures = 5)
 DimPlot(data, reduction = "umap")
 
 
