@@ -1,0 +1,271 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/DisplayIntegrate.RMD')
+# Libraries
+require(data.table)
+
+library(dplyr)
+library(Seurat)
+library(h5)
+library(readxl)
+library(ggplot2)
+library(ggrepel)
+library(stringr)
+library(data.table)
+
+require(gridExtra)
+
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/FunctionsIntegrate.R')
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/PlotAll.R')
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Plot_func.R')
+
+folder_base_input <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
+folder_base_output <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/Integrate Pair/'
+
+filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
+sampleParam <- read_excel(filename_sampleParam)
+
+filename_sampleParam_integrate <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_integrate_parameters.xlsx'
+sampleParam_integrate <- read_excel(filename_sampleParam_integrate)
+
+filename_sample_Integrate_pairs <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_Integrate_pairs.xlsx'
+sample_Integrate_pairs <- read_excel(filename_sample_Integrate_pairs)
+```
+
+
+# Get Folders
+```{r}
+#filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
+#metaData <- read_excel(filename_metaData)
+sample_type = 'BM'
+
+
+patient = 34  
+filter = TRUE
+regress_TF = TRUE
+  
+pair_list =  sample_Integrate_pairs[ sample_Integrate_pairs$'Patient Number' == patient, ]
+  
+sample_name_pre = pair_list[[paste0('Sample Pre ', sample_type)]]
+sample_name_post = pair_list[[paste0('Sample Post ', sample_type)]]
+  
+
+print(folder_base_input)
+folder_pre = makeFolders(folder_base_input,sample_name_pre,filter,regress_TF,TRUE)
+
+folder_post = makeFolders(folder_base_input,sample_name_post,filter,regress_TF,FALSE)
+
+folder_pre = makeFolders(folder_base_output,sample_name_pre,filter,regress_TF,TRUE)
+folder_post = makeFolders(folder_base_output,sample_name_post,filter,regress_TF,FALSE)
+folder_output = c(folder_pre,folder_post)
+  
+  
+filter_pre = sampleParam$filter_TF[sampleParam['Sample'] == sample_name_pre]
+filter_post = sampleParam$filter_TF[sampleParam['Sample'] == sample_name_post]
+regress_pre = sampleParam$regress_TF[sampleParam['Sample'] == sample_name_pre]
+regress_post = sampleParam$regress_TF[sampleParam['Sample'] == sample_name_post]
+  
+folder_orig_pre = makeFolders(folder_base_input,sample_name_pre,filter = filter_pre,regress_TF = regress_pre,FALSE)
+data_orig_pre = loadRData(paste0(folder_orig_pre,'data.Robj' ))
+folder_orig_post = makeFolders(folder_base_input,sample_name_post,filter = filter_post,regress_TF = regress_post,FALSE)
+data_orig_post = loadRData(paste0(folder_orig_post,'data.Robj'))
+  
+cluster_IDs_pre <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name_pre]
+cluster_IDs_post <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name_post]
+
+print('Starting Plotting')
+print(paste0('Sample: ', sample_name_pre))
+print(paste0('folder: ', folder_output[1]))
+    
+
+#print(FeaturePlot(data, features))
+```
+
+# Plot
+```{r}
+#plotAll(data,folder_output[1],sample_name_pre,sampleParam_integrate, label_TF = FALSE)
+data = loadRData(paste0(folder_output[1],'data.Robj'))
+
+label_TF = TRUE
+sample_name = sample_name_pre
+folder = folder_output[1]
+integrate_TF = TRUE
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/FunctionsIntegrate.R')
+require(gtools)
+  
+print(sample_name)
+print(folder)
+print(paste0('label_TF: ', label_TF))
+Patient_num  = sampleParam$`Patient Number`[sampleParam['Sample'] == sample_name]
+  
+# Known Cell Markers
+cell_features = getCellMarkers()
+  
+print(paste0('file_str: ', file_str))
+  
+##################
+## PCA
+##################
+PCA_dim = sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
+visualize_PCA(data,folder,sample_name,PCA_dim)
+
+pathName <- paste0(folder,'PCA/elbow_',PCA_dim,'.png')
+#png(file=pathName,width=600, height=350)
+print(ElbowPlot(data,ndims = PCA_dim))
+#dev.off()
+
+resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+#data = getCluster (data,resolution_val, PCA_dim)
+  
+  
+# Name cells
+if (label_TF){
+  file_str = '_label'
+  cluster_IDs = sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name]
+  #browser()
+  data = label_cells(data,cluster_IDs)
+  # Percentage of cell type
+}else{
+  file_str = ''
+}
+```
+
+
+```{r}
+##############################
+## Get Cluster Stats
+##############################
+  
+if (integrate_TF){
+  data_pre = data@active.ident[which(data$orig.ident == "data_pre")]
+  data_post = data@active.ident[which(data$orig.ident == "data_post")]
+    
+  cluster_num = clusterStats(data@active.ident)
+  cluster_num_pre = clusterStats(data_pre)
+  cluster_num_post = clusterStats(data_post)
+    
+  print(cluster_num)
+    
+  #write.csv(cluster_num, file = paste0(folder,'Stats/clusterStats',file_str,'.csv'),row.names = FALSE)
+  #write.csv(cluster_num_pre, file = paste0(folder,'Stats/clusterStats_pre',file_str,'.csv'),row.names = FALSE)
+  #write.csv(cluster_num_post, file = paste0(folder,'Stats/clusterStats_post',file_str,'.csv'),row.names = FALSE)
+}
+##############################
+## Find Cluster Biomarkers
+##############################
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+markers <- FindAllMarkers(data, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+markers  %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+# Plotting the top 10 markers for each cluster.
+top10 = markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+all_markers =  markers %>% group_by(cluster)
+  
+# Add known markers
+all_markers = cellMarkers(all_markers,cell_features)
+  
+#write.csv(all_markers, file = paste0(folder,'DE/AllFeatures',file_str,'_Patient',Patient_num,'.csv'),row.names=FALSE)
+  
+# Get DE between cluster permutations
+DE_perm_TF = FALSE
+if (DE_perm_TF){
+  filepath_mvn = paste0( folder, 'DE/nVsm/')
+  print(filepath_mvn)
+  dir.create( filepath_mvn, recursive = TRUE)
+  Features_mvn_df = diffExpPermute(data,cell_features)
+    
+  level_list = unique(levels(data))
+  for (level in 1:length(level_list) ){
+    ident1 = level_list[level]
+      
+    if (ident1 == '?'){
+      ident1 = 'NA'
+    }
+      
+    df_output = Features_mvn_df[[level]]
+    df_output = df_output[c("p_val","avg_logFC", "pct.1", "pct.2", "p_val_adj","ident_1","ident_2","gene", "Cell")]
+    filepath = paste0(filepath_mvn
+                      ,'Features_',ident1,'Vsn',file_str
+                      ,'_Patient',Patient_num,'.csv')
+    print(filepath)
+    #write.csv(df_output, file = filepath,row.names = FALSE)
+  }
+}
+  ########################
+  ## Visualize clustering
+  ########################
+filepath_cluster = paste0( folder, 'Cluster/', 'PCA',PCA_dim,'/res',resolution_val,'/' )
+print('filepath_cluster')
+print(filepath_cluster)
+dir.create( filepath_cluster, recursive = TRUE)
+  
+pathName <- paste0(filepath_cluster,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
+#png(file=pathName,width=600, height=350, res = 100)
+print(DimPlot(data, reduction = "umap",label = TRUE,pt.size = 1))
+#dev.off()
+  
+pathName <- paste0(filepath_cluster,paste0('HeatMap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
+#png(file=pathName,width=1000, height=1200)
+print(DoHeatmap(data, features = top10$gene))
+#dev.off()
+  
+pathName <- paste0(filepath_cluster,'ClusterMetrics','.png')
+#png(file=pathName,width=600, height=350)
+print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
+#dev.off()
+  
+  
+pathName <- paste0(filepath_cluster,'ClusterMetrics','.png')
+#png(file=pathName,width=600, height=350)
+print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
+#dev.off()
+  
+if (integrate_TF){
+  pathName <- paste0(filepath_cluster,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,'_split',file_str,'.png'))  
+  #png(file=pathName,width=600, height=350)
+  print(DimPlot(data, label=T, repel=F, reduction = "umap", split.by = "orig.ident"))
+  #dev.off()
+}
+    
+cluster_IDs = sampleParam_integrate[['Cluster_IDs']][sampleParam_integrate['Sample'] == sample_name_pre]
+data = label_cells(data,cluster_IDs)
+    
+```
+
+# DE
+```{r}
+
+cell_type_list = c('T Cell','T Cell Cytotoxic', 'Monocyte CD14','Monocyte FCGR3A','NK','B Cell', 'DC')
+
+
+## Get p Val between pre/post clusters
+
+df_expr_pval = diff_exp_pval_helper(data, folder_pre,sample_name_pre,cell_type_list)
+#write.csv(df_expr_pval, file = paste0(folder_output[1],'DE/DE_pval_Patient',patient,'.csv'),row.names=FALSE)
+    
+
+## Get DE Genes
+data@meta.data$condition = gsub("^.*_","",data@meta.data$orig.ident)
+data$celltype.condition = paste(Idents(data), data$condition, sep = "_")
+data$celltype = Idents(data)
+Idents(data) = "celltype.condition"
+df_expr_gene = diffExpGene(data, folder_pre,sample_name_pre,cell_type_list)
+df_expr_gene = df_expr_gene[df_expr_gene$p_val_adj < 0.05,] # Should save all but only use those <0.05
+#write.csv(df_expr_gene, file = paste0(folder_output[1],'DE/DE_Patient',patient,'.csv'),row.names=FALSE)
+
+  
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

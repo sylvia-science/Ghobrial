@@ -12,7 +12,7 @@ library(ggplot2)
 
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Plot_func.R')
-
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/PlotAll.R')
 run = FALSE
 
 folder_base <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
@@ -26,7 +26,7 @@ metaData <- read_excel(filename_metaData)
 patient_list = c(10, 5, 20, 12, 34, 28, 21, 31, 16, 51, 6, 40) # all
 
 
-for(i in patient_list){
+for(i in 1:nrow(metaData)){
   sample_name <- metaData$Sample[i]
   filename <- paste("C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/",sample_name,"_raw_feature_bc_matrix.h5",sep = "")
   
@@ -38,17 +38,17 @@ for(i in patient_list){
     
     filter <- TRUE
     regress_TF = FALSE
-    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE)
+    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE, makeFolder_TF= TRUE)
     data = run_pipeline(filename,folder,sample_name,sampleParam,filter,regress_TF)
     
     save(data,file=paste0(folder,'data.Robj'))
     write.csv(param_data, file = paste0(folder,'parameters.csv'),row.names=FALSE)
     
-    get_cellType(data,data_orig,folder,sample_name)
+    get_cellType(data,data_orig,folder, cell_features = NA,split = FALSE)
   
     
     regress_TF = TRUE
-    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE)
+    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE, makeFolder_TF = TRUE)
     data = run_pipeline(filename,folder,sample_name,sampleParam,filter,regress_TF)
 
     save(data,file=paste0(folder,'data.Robj'))
@@ -58,7 +58,7 @@ for(i in patient_list){
     
     filter <- FALSE
     regress_TF = FALSE
-    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE)
+    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE, makeFolder_TF = TRUE)
     data = run_pipeline(filename,folder,sample_name,sampleParam,filter,regress_TF)
     
     save(data,file=paste0(folder,'data.Robj'))
@@ -68,7 +68,7 @@ for(i in patient_list){
     
     
     regress_TF = TRUE
-    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE)
+    folder = makeFolders(folder_base,sample_name,filter,regress_TF,TRUE, makeFolder_TF = TRUE)
     data = run_pipeline(filename,folder,sample_name,sampleParam,filter,regress_TF)
     
     save(data,file=paste0(folder,'data.Robj'))
@@ -91,19 +91,19 @@ for(i in patient_list){
       filter = sampleParam$filter_TF[sampleParam['Sample'] == sample_name]
       regress_TF = sampleParam$regress_TF[sampleParam['Sample'] == sample_name]
     
-
-      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE)
+      folder = makeFolders(folder_base,sample_name,filter,regress_TF,makeFolder_TF = TRUE)
       print(paste0('folder: ', folder))
       
-      data <- loadRData(paste0(folder,'data.Robj'))
-      plotAll(data,folder,sample_name,filter,regress_TF, label_TF = FALSE)
-      plotAll(data,folder,sample_name,filter,regress_TF, label_TF = TRUE)
+      data = loadRData(paste0(folder,'data.Robj'))
+      plotAll(data,folder,sample_name,sampleParam,label_TF = FALSE,integrate_TF = FALSE)
+      plotAll(data,folder,sample_name,sampleParam,label_TF = TRUE,integrate_TF = FALSE)
       
+
     }else{
       # Filter on
       filter = TRUE
       regress_TF = FALSE
-      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE)
+      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE, makeFolder_TF = TRUE)
       print(paste0('folder: ', folder))
        
       data <- loadRData(paste0(folder,'data.Robj'))
@@ -111,7 +111,7 @@ for(i in patient_list){
       plotAll(data,folder,sample_name,filter,regress_TF, label_TF = TRUE)
       
       regress_TF = TRUE
-      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE)
+      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE, makeFolder_TF = TRUE)
       print(paste0('folder: ', folder))
       
       data <- loadRData(paste0(folder,'data.Robj'))
@@ -122,7 +122,7 @@ for(i in patient_list){
       # Filter off
       filter = FALSE
       regress_TF = FALSE
-      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE)
+      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE, makeFolder_TF = TRUE)
       print(paste0('folder: ', folder))
       
       data <- loadRData(paste0(folder,'data.Robj'))
@@ -130,14 +130,14 @@ for(i in patient_list){
       plotAll(data,folder,sample_name,filter,regress_TF, label_TF = TRUE)
       
       regress_TF = TRUE
-      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE)
+      folder = makeFolders(folder_base,sample_name,filter,regress_TF,FALSE, makeFolder_TF = TRUE)
       print(paste0('folder: ', folder))
       
       data <- loadRData(paste0(folder,'data.Robj'))
       plotAll(data,folder,sample_name,filter,regress_TF, label_TF = FALSE)
       plotAll(data,folder,sample_name,filter,regress_TF, label_TF = TRUE)
       }
-      #get_cellType(data,data_orig,folder,sample_name,filter)
+      #get_cellType(data,data_orig,folder,cell_features = NA)
   }
 }
 

@@ -1,4 +1,3 @@
-
 # source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/main_integrate.R')
 # Libraries
 
@@ -7,13 +6,17 @@ library(Seurat)
 library(h5)
 library(readxl)
 library(ggplot2)
+library(ggrepel)
 library(stringr)
 library(data.table)
 
+require(gridExtra)
 
 #library(biomaRt)
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
-source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/Functions_integrate.R')
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/FunctionsIntegrate.R')
+source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/PlotAll.R')
+
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Plot_func.R')
 
 run = FALSE
@@ -33,7 +36,9 @@ sample_Integrate_pairs <- read_excel(filename_sample_Integrate_pairs)
 #filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
 #metaData <- read_excel(filename_metaData)
 sample_type = 'BM'
-#sample_type = 'PB'
+
+cell_type_list = c('T Cell','T Cell Cytotoxic', 'Monocyte CD14','Monocyte FCGR3A','NK','B Cell', 'DC')
+
 
 print('Start')
 patient_list = c(10, 5, 20, 12, 34, 28, 21, 31, 16, 51, 6, 40) # all
@@ -43,22 +48,22 @@ patient_list_dexaF = c(5,12, 16)
 patient_list_dexaT = c(10,20,34,28,21,31,51,6,40)
 
 redo = c( 20, 34, 28, 21, 31, 40)
-for(patient in patient_list){ # Patient numbers 
+for(patient in 34){ # Patient numbers 
   
   filter = TRUE
   regress_TF = TRUE
   
   pair_list =  sample_Integrate_pairs[ sample_Integrate_pairs$'Patient Number' == patient, ]
-
+  
   sample_name_pre = pair_list[[paste0('Sample Pre ', sample_type)]]
   sample_name_post = pair_list[[paste0('Sample Post ', sample_type)]]
-
+  
   sample_name_list = c(sample_name_pre,sample_name_post)
-
-  print('hi')
+  
+  print('Running')
   print(folder_base_input)
   folder_pre = makeFolders(folder_base_input,sample_name_pre,filter,regress_TF,TRUE)
-  print('here')
+
   folder_post = makeFolders(folder_base_input,sample_name_post,filter,regress_TF,FALSE)
   folder_input = c(folder_pre,folder_post)
   
@@ -77,19 +82,17 @@ for(patient in patient_list){ # Patient numbers
   folder_orig_post = makeFolders(folder_base_input,sample_name_post,filter = filter_post,regress_TF = regress_post,FALSE)
   data_orig_post = loadRData(paste0(folder_orig_post,'data.Robj'))
   
-  cluster_IDs_pre <- sampleParam$Cluster_IDs_post_regress[sampleParam['Sample'] == sample_name_pre]
-  cluster_IDs_post <- sampleParam$Cluster_IDs_post_regress[sampleParam['Sample'] == sample_name_post]
-  
+  cluster_IDs_pre <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name_pre]
+  cluster_IDs_post <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name_post]
+  #browser()
   data_orig_pre = label_cells(data_orig_pre,cluster_IDs_pre)
   data_orig_post = label_cells(data_orig_post,cluster_IDs_post)
   
   data_integrated_orig = merge(data_orig_pre, data_orig_post)
   
-  cell_type_list = c('T Cell', 'Monocyte CD14','Monocyte FCGR3A','NK','B Cell', 'DC')
   
   if (run == TRUE){
-  
-    #browser()
+    
     print('running')
     
     data_integrated = run_pipeline_integrate(folder_input,folder_output,sample_name_list,sampleParam_integrate)
@@ -98,55 +101,47 @@ for(patient in patient_list){ # Patient numbers
     param_output =  sampleParam_integrate[ sampleParam_integrate$Sample == sample_name_pre, ]
     write.csv(param_output, file = paste0(folder_output[1],'parameters.csv'),row.names=FALSE)
     
-    get_cellType(data_integrated,data_integrated_orig,folder_output[1],sample_name_list[1])
-    data_integrated = label_cells(data_integrated,cluster_IDs)
+    #MakeFeaturePlot(data_integrated,data_integrated_orig, cell_features = NA, split = FALSE)
+    #data_integrated = label_cells(data_integrated,cluster_IDs)
     
-
+    
     
     print('done!')
-  
+    
   }else{
+    
     
     print('Starting Plotting')
     print(paste0('Sample: ', sample_name_pre))
-    
     print(paste0('folder: ', folder_output[1]))
     
-    resolution_val<- sampleParam_integrate$resolution_val[sampleParam_integrate['Sample'] == sample_name_list[1]]
+    data = loadRData(paste0(folder_output[1],'data.Robj'))
+
+    #print(FeaturePlot(data, features))
     
-    
-    data <- loadRData(paste0(folder_output[1],'data.Robj'))
-    
-    plotAll(data,folder_output[1],sample_name_list[1],sampleParam_integrate, label_TF = FALSE)
-    # Split by orig ident
-    pathName <- paste0(folder_output[1],paste0('Cluster/ClusterUmap',resolution_val,'_split','.png'))
-    png(file=pathName,width=600, height=350)
-    print(DimPlot(data, label=T, repel=F, reduction = "umap", split.by = "orig.ident"))
-    dev.off()
-    
-    plotAll(data,folder_output[1],sample_name_list[1],sampleParam_integrate, label_TF =TRUE)
-    # Split by orig ident
-    pathName <- paste0(folder_output[1],paste0('Cluster/ClusterUmap',resolution_val,'_split','.png'))  
-    png(file=pathName,width=600, height=350)
-    print(DimPlot(data, label=T, repel=F, reduction = "umap", split.by = "orig.ident"))
-    dev.off()
-    
-    cluster_IDs <- sampleParam_integrate[['Cluster_IDs']][sampleParam_integrate['Sample'] == sample_name_list[1]]
+    plotAll(data,folder_output[1],sample_name_pre,sampleParam_integrate, 
+            label_TF = FALSE, integrate_TF = TRUE, DE_perm_TF = TRUE)
+    plotAll(data,folder_output[1],sample_name_pre,sampleParam_integrate, 
+           label_TF =TRUE, integrate_TF = TRUE, DE_perm_TF = TRUE)
+
+    PCA_dim = sampleParam_integrate$PCA_dim[sampleParam_integrate['Sample'] == sample_name_pre]
+    resolution_val<- sampleParam_integrate$resolution_val[sampleParam_integrate['Sample'] == sample_name_pre]
+    data = getCluster(data,resolution_val, PCA_dim)
+    cluster_IDs = sampleParam_integrate[['Cluster_IDs']][sampleParam_integrate['Sample'] == sample_name_pre]
     data = label_cells(data,cluster_IDs)
-    
-    
+
     df_expr_pval = diff_exp_pval_helper(data, folder_pre,sample_name_pre,cell_type_list)
-    write.csv(df_expr_pval, file = paste0(folder_output[1],'DE/diffExpr_pval_Patient',patient,'.csv'),row.names=FALSE)
+    write.csv(df_expr_pval, file = paste0(folder_output[1],'DE/DE_pval_Patient',patient,'.csv'),row.names=FALSE)
     
+    ## Get DE Genes
     data@meta.data$condition = gsub("^.*_","",data@meta.data$orig.ident)
     data$celltype.condition = paste(Idents(data), data$condition, sep = "_")
     data$celltype = Idents(data)
     Idents(data) = "celltype.condition"
     df_expr_gene = diffExpGene(data, folder_pre,sample_name_pre,cell_type_list)
-    write.csv(df_expr_gene, file = paste0(folder_output[1],'DE/diffExprGene_Patient',patient,'.csv'),row.names=FALSE)
-    
+    df_expr_gene = df_expr_gene[df_expr_gene$p_val_adj < 0.05,] # Should save all but only use those <0.05
+    write.csv(df_expr_gene, file = paste0(folder_output[1],'DE/DE_Patient',patient,'.csv'),row.names=FALSE)
 
   }
-
+  
 }
-
