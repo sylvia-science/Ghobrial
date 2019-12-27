@@ -11,9 +11,8 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,sample_name
   # The [[ operator can add columns to object metadata. This is a great place to stash QC stats
   # Calculating percent Mitochondrial 
   print(nFeature_RNA_list)
-  browser()
   data[["percent.mt"]] = PercentageFeatureSet(data, pattern = "^MT-")
-  
+  #browser()
   if (filter == TRUE){
     
     print(nFeature_RNA_list)
@@ -21,7 +20,7 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,sample_name
     print(nFeature_RNA_list[2])
     nFeature_RNA_min = as.numeric(nFeature_RNA_list[1])
     nFeature_RNA_max = as.numeric(nFeature_RNA_list[2])
-    #browser()
+    #\browser()
     nFeature_RNA_tmp = 100
     
     # Can't use subset function because doesn't work with variables
@@ -62,9 +61,9 @@ quality_control <- function(data,filter,nFeature_RNA_list,percent_mt,sample_name
 # Examine and visualize PCA results a few different ways
 # TO DO: Run PCA with 30 dim first, save images, then run with param values
 #######################################
-visualize_PCA = function(data,folder,sample_name,PCA_dim){
+visualize_PCA = function(data,folder,PCA_dim){
   print('Visualize PCA')
-  print(data[["pca"]], dims = 1:5, nfeatures = 5)
+  #print(data[["pca"]], dims = 1:5, nfeatures = 5)
   
   pathName <- paste0(folder,'PCA/DimLoading.png')
   png(file=pathName,width=600, height=350)
@@ -148,9 +147,9 @@ visualize_PCA = function(data,folder,sample_name,PCA_dim){
 # Examine and visualize PCA results a few different ways
 # TO DO: Run PCA with 30 dim first, save images, then run with param values
 #######################################
-visualize_PCA = function(data,folder,sample_name,PCA_dim){
+visualize_PCA = function(data,folder,PCA_dim){
   print('Visualize PCA')
-  print(data[["pca"]], dims = 1:5, nfeatures = 5)
+  #print(data[["pca"]], dims = 1:5, nfeatures = 5)
   
   pathName <- paste0(folder,'PCA/DimLoading.png')
   png(file=pathName,width=600, height=350)
@@ -175,33 +174,11 @@ visualize_PCA = function(data,folder,sample_name,PCA_dim){
   print(DimHeatmap(data, dims = 1:(min(6,PCA_dim)), cells = 500, balanced = TRUE))
   dev.off()
   
-  if (PCA_dim <=6){
+  for (i in 1:PCA_dim ){
     
-    pathName <- paste0(folder,paste0('PCA/DimHeatMap1_',PCA_dim,'.png'))
+    pathName <- paste0(folder,paste0('PCA/DimHeatMap_',i,'.png'))
     png(file=pathName,width=2000, height=1000, res=300)
-    print(DimHeatmap(data, dims = 1:PCA_dim, cells = 500, balanced = TRUE))
-    dev.off()
-  }else if (PCA_dim <=10){
-    
-    pathName <- paste0(folder,paste0('PCA/DimHeatMap1_',5,'.png'))
-    png(file=pathName,width=2000, height=1000, res=300)
-    print(DimHeatmap(data, dims = 1:5, cells = 500, balanced = TRUE))
-    dev.off()
-    
-    pathName <- paste0(folder,paste0('PCA/DimHeatMap6_',PCA_dim,'.png'))
-    png(file=pathName,width=2000, height=1000, res=300)
-    print(DimHeatmap(data, dims = 6:PCA_dim, cells = 500, balanced = TRUE))
-    dev.off()
-  }else if (PCA_dim <=20){
-    
-    pathName <- paste0(folder,paste0('PCA/DimHeatMap1_',6,'.png'))
-    png(file=pathName,width=2000, height=1000, res=300)
-    print(DimHeatmap(data, dims = 1:6, cells = 500, balanced = TRUE))
-    dev.off()
-    
-    pathName <- paste0(folder,paste0('PCA/DimHeatMap6_',12,'.png'))
-    png(file=pathName,width=2000, height=1000, res=300)
-    print(DimHeatmap(data, dims = 7:12, cells = 500, balanced = TRUE))
+    print(DimHeatmap(data, dims = i, cells = 500, balanced = TRUE))
     dev.off()
   }
   
@@ -229,11 +206,9 @@ visualize_PCA = function(data,folder,sample_name,PCA_dim){
 #########################
 ## Make FeaturePlot
 #########################
-MakeFeaturePlot = function(data,data_orig, folder, cell_features,split){
-  
+PlotKnownMarkers = function(data,data_orig, folder, cell_features,split, featurePlotFix = TRUE){
+  #browser()
   print(folder)
-  
-  sample <- data
   
   if (is.na(cell_features)){
     
@@ -260,41 +235,81 @@ MakeFeaturePlot = function(data,data_orig, folder, cell_features,split){
     }
     gene_list = (x[x %in% all_markers])  
     # FeaturePlot gives error if no genes are found, so we have to check if they are included in the highly variable gene list
-    if (length(gene_list > 0)){
-      #print(paste0( cell_type,': Found'))
-      #print(x)
-      
-      # TO DO Add dotplot
+    if (!featurePlotFix & length(gene_list) > 0){
+      print(paste0( cell_type,': Found'))
+      print(x)
+        
       subtitle_str = paste0(cell_type,': ', toString(x))
       if (split){
-        plot = FeaturePlot(sample, features = (x),split.by = "orig.ident")
+        plot = FeaturePlot(data, features = (x),split.by = "orig.ident")
       }else{
-        plot = FeaturePlot(sample, features = (x))
+        plot = FeaturePlot(data, features = (x))
       }
-      plot = plot + labs(subtitle=subtitle_str) + theme(plot.subtitle = element_text(hjust=0.5, size=16))
+      plot_final = plot + labs(subtitle=subtitle_str) + theme(plot.subtitle = element_text(hjust=0.5, size=16))
       pathName <- paste0(folder,cell_type,'.png')
       png(file=pathName)
-      print(plot)
+      print(plot_final)
       dev.off()
-    }
-    else {
-      #print(paste0( cell_type,': Not Found'))
+      
+    #######################################
+    }else if (featurePlotFix & length(gene_list) > 0){
+      print(paste0( cell_type,': Found'))
+      print(x)
+      plot_list = vector('list',length(gene_list))
+      #browser()
+      for (j in 1:length(gene_list)){
+        gene = gene_list[j]
+        print(gene)
+        plot = FeaturePlotFix(data, feature = gene,folder = '',str = '', split = split, gene_TF = TRUE,title = '',saveTF = FALSE)
+        #plot_list[[j]] = plot
+        
+        pathName = paste0(folder,cell_type,'_',gene,'.png')
+        ggsave(file=pathName, plot) #saves g
+        remove(plot)
+        
+      }
+      #browser()
+      #plot_final = grid.arrange(grobs = plot_list, ncol = 2) #plot_grid(plot_list,labels=gene_list)
+      #remove(plot_list)
+      #print(plot_final)
+      
+      #pathName = paste0(folder,cell_type,'.png')
+      #browser()
+      #height_val = ceiling(length(plot_final)/2)
+      #ggsave(file=pathName, plot_final) #saves g
+      
+      
+      remove(plot_final)
+      #ggsave(file=pathName, width = 4, height = height_val, plot_final) #saves g
+      
+    }else {
+      print(paste0( cell_type,': Not Found'))
       #print(x)
     }
+    
+    
+    
     print('')
     
   }
   
 }
 
-FeaturePlotFix = function(data, feature,folder,str, split, gene_TF){
-  # Feature: 1 gene name
-  if (feature == "HLA-DQA2"){
-    #browser()
-  }
+FeaturePlotFix = function(data, feature,folder,str, split, gene_TF,title = '',saveTF = TRUE){
+  #browser()
   data_umap = FetchData(data, vars = c("ident", "orig.ident","UMAP_1", "UMAP_2"))
-  data_df = data.frame(data@assays$RNA@data) 
-  
+  if (data@active.assay == 'RNA'){
+    data_df = data.frame(data@assays$RNA@data) 
+    #gene1 <- data_df1[rownames(data_df1) == 'GNLY',]
+    #data_df = data.frame(data@assays$integrated@data) 
+    
+  }else if (data@active.assay == 'integrated'){
+    #data_df2 = data.frame(data@assays$integrated@data) 
+    #gene2 <- data_df2[rownames(data_df2) == 'GNLY',]
+    #data_df = data.frame(data@assays$integrated@data) 
+    data_df = data.frame(data@assays$RNA@data) 
+    
+  }
   if (gene_TF){
     gene <- data_df[rownames(data_df) == feature,]
     gene <- data.frame(t(gene))
@@ -307,18 +322,21 @@ FeaturePlotFix = function(data, feature,folder,str, split, gene_TF){
     data_matrix = select(data_matrix, feature)
     data_umap$g = data_matrix[,1]
   }
-  
-  
+  #browser()
     if (split){
       class_umap_data_pre = subset(data_umap, data_umap$orig.ident == "data_pre",)
       class_umap_data_post = subset(data_umap, data_umap$orig.ident == "data_post",)
     
       #data_umap_cell = subset(data_umap, data_umap$ident == str,)
       #max_val = ceiling(max(data_umap_cell$g))
-      max_val = 4
+      max_val = 2
       min_val = 0
+      
+      #data_umap$g[data_umap$g <0] = 0
+      color_low = 'grey'
+      #browser()
       # Adding cluster label to center of cluster on UMAP
-    
+      
       umap_label <- FetchData(data, vars = c("ident", "orig.ident","UMAP_1", "UMAP_2"))  %>%
       group_by(orig.ident, ident) %>% 
       summarise(x=mean(UMAP_1), y = mean(UMAP_2))
@@ -329,7 +347,8 @@ FeaturePlotFix = function(data, feature,folder,str, split, gene_TF){
       markerSize = 1
       g_pre = ggplot(class_umap_data_pre, aes(UMAP_1, UMAP_2)) +  
         geom_point(aes(colour = class_umap_data_pre$g), size = markerSize) + 
-        scale_color_gradient(low = "grey", high = "red", name = "", limits = c(min_val,max_val) ) +
+        scale_color_gradient(low = color_low, high = "red", name = "", limits = c(min_val,max_val) ) +
+        geom_text_repel(data=umap_label_pre, aes(label=ident, x, y))  +
         ggtitle("Pre",  subtitle = feature) +
         theme(plot.title = element_text(hjust = 0.5))+
         theme(plot.subtitle = element_text(hjust = 0.5))+
@@ -350,7 +369,8 @@ FeaturePlotFix = function(data, feature,folder,str, split, gene_TF){
       
       g_post = ggplot(class_umap_data_post, aes(UMAP_1, UMAP_2)) +  
         geom_point(aes(colour = class_umap_data_post$g), size=markerSize) + 
-        scale_color_gradient(low = "grey", high = "red", name = "" , limits = c(min_val,max_val) ) +
+        scale_color_gradient(low = color_low, high = "red", name = "" , limits = c(min_val,max_val) ) +
+        geom_text_repel(data=umap_label_post, aes(label=ident, x, y))  +
         ggtitle("Post",  subtitle = feature) +
         theme(plot.title = element_text(hjust = 0.5))+
         theme(plot.subtitle = element_text(hjust = 0.5))+
@@ -366,8 +386,80 @@ FeaturePlotFix = function(data, feature,folder,str, split, gene_TF){
       print(g_output)
       dev.off()
       
+    }else{
+      #class_umap_data_post = subset(data_umap, data_umap$orig.ident == "data_post",)
+      #data_umap_cell = subset(data_umap, data_umap$ident == str,)
+      #max_val = ceiling(max(data_umap_cell$g))
+      max_val = 2
+      min_val = 0
+      
+      #data_umap$g[data_umap$g <0] = 0
+      color_low = 'grey'
+      #browser()
+      # Adding cluster label to center of cluster on UMAP
+      
+      #umap_label <- FetchData(data, vars = c("ident", "orig.ident","UMAP_1", "UMAP_2"))  %>%
+      #  group_by(orig.ident, ident) %>% 
+      #  summarise(x=mean(UMAP_1), y = mean(UMAP_2))
+      
+      #umap_label_pre <- subset(umap_label, umap_label$orig.ident == "data_pre",)
+      
+      fontSize = 24
+      markerSize = 0.2
+      g_post = ggplot(data_umap, aes(UMAP_1, UMAP_2)) +  
+        geom_point(aes(colour = data_umap$g), size = markerSize) +
+        scale_color_gradient(low = color_low, high = "red", name = "") +
+        #geom_text_repel(data=umap_label_pre, aes(label=ident, x, y))  +
+        ggtitle(title,  subtitle = feature) +
+        theme(plot.title = element_text(hjust = 0.5))+
+        theme(plot.subtitle = element_text(hjust = 0.5))+
+        theme(plot.title = element_text(size=fontSize)) + 
+        theme(plot.subtitle = element_text(size=fontSize)) + 
+        theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+              panel.background = element_blank(), axis.line = element_line(colour = "black"))
+        #browser()
+      if (saveTF){
+        pathName <- paste0(folder,str,'_',feature,'.png')
+        png(file=pathName, width=2000, height=1000, res=100)
+        print(g_post)
+        dev.off()
+      }
+      
+      return (g_post)
     }
   #browser()
   
 }
+
+
+plotHLA = function(data,folder_base_output,str){
+  #################
+  ## dCD14+ genes
+  #################
+  #browser()
+  folder_output_analysis =  paste0( folder_base_output, 'Analysis/FeaturePlot_HLA/',str,'/' )
+  dir.create( folder_output_analysis, recursive = TRUE)
+  
+  Features_dCD14_MonoVsn_label_Patient10 = 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/Integrate Pair/GL1080BM/Filtered/Regress/DE/nVsm/Features_dCD14+ MonoVsn_label_Patient10.csv'    
+  Features_dCD14_MonoVsn_label_Patient10  = read.csv(Features_dCD14_MonoVsn_label_Patient10)
+  Features_dCD14_MonoVsn_label_Patient10 = Features_dCD14_MonoVsn_label_Patient10[Features_dCD14_MonoVsn_label_Patient10$ident_2 == 'CD14+ Mono', ]
+  Features_dCD14_MonoVsn_label_Patient10 = Features_dCD14_MonoVsn_label_Patient10[Features_dCD14_MonoVsn_label_Patient10$p_val_adj < 0.05, ]
+  Features_dCD14_MonoVsn_label_Patient10 = levels(Features_dCD14_MonoVsn_label_Patient10$gene)
+  
+  DEgeneHLA = c(Features_dCD14_MonoVsn_label_Patient10)
+  DEgeneHLA = DEgeneHLA[grep('HLA', DEgeneHLA)]
+  
+  for (i in 1:(length(DEgeneHLA))){
+    feature = as.character(DEgeneHLA[i])
+    print(feature)
+    FeaturePlotFix(data, feature,folder_output_analysis,str, split = FALSE, gene_TF = TRUE)
+  }
+  
+  data_score = AddModuleScore(object = data, features = list(DEgeneHLA),nbin = 25, ctrl = 7, name = 'HLA_Feature')
+  score_HLA_orig = data_score[[]]
+  score_HLA = subset(score_HLA_orig, select = c(orig.ident,HLA_Feature1))
+  FeaturePlotFix(data_score, 'HLA_Feature1',folder_output_analysis,'DexaT', split = FALSE, gene_TF = FALSE)
+  
+}
+
 

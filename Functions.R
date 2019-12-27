@@ -49,11 +49,11 @@ gene_var = function(data, nfeatures_val){
 ##############################
 getCluster = function(data,resolution_val, PCA_dim){
   print('Get Cluster')
-  data <- FindNeighbors(data, dims = 1:PCA_dim)
-  data <- FindClusters(data, resolution = resolution_val) # Value of the resolution parameter, use a value above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
+  data = FindNeighbors(data, dims = 1:PCA_dim)
+  data = FindClusters(data, resolution = resolution_val) # Value of the resolution parameter, use a value above (below) 1.0 if you want to obtain a larger (smaller) number of communities.
   head(Idents(data), 5)
   #data <- RunTSNE(data, dims = 1:PCA_dim)
-  data <- RunUMAP(data, dims = 1:PCA_dim)
+  data = RunUMAP(data, dims = 1:PCA_dim)
 }
 
 
@@ -190,6 +190,7 @@ ConvertCellMarkers = function(cellMarker){
 }
 
 getCellMarkers = function(){
+  #browser()
   cell_features_file = 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Cell_IDS.xlsx'
   cell_features = read_excel(cell_features_file)
   
@@ -242,8 +243,26 @@ getCellMarkers = function(){
                         tcell_CD4_naive_TREG, tcell_CD4_TFH,
                         tcell_CD4_TH1, tcell_CD4_TH2,
                         tcell_CD4_TH17, tcell_CD4_TH117)
-  #browser(0)
+  
+  cell_features = cell_features[cell_features$Plot_marker == 1,]
+  #browser()
   return(cell_features)
+}
+
+SaveAsMatrix = function(data,folder_base_output){
+  data_df = data.frame(data@assays$RNA@data) 
+  
+  data_df = t(data_df)
+  data_df = data.frame(data_df)
+  
+  split_var =  data@meta.data$split_var
+  data_df$category = split_var
+  data_df$ident =   levels(data@active.ident)
+  setDT(data_df)
+  
+  fwrite(data_df, paste0(folder_base_output ,"df.csv"))
+  
+  write.csv(data_df, paste0(folder_base_output ,"df.csv"))
 }
 
 
