@@ -1,8 +1,7 @@
-plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_perm_TF = FALSE){
+plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF = FALSE,DE_perm_TF = FALSE,clusterTF = TRUE){
   source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/FunctionsIntegrate.R')
   require(gtools)
-  
-  print(sample_name)
+  #browser()
   print(folder)
   print(paste0('label_TF: ', label_TF))
   Patient_num  = sampleParam$`Patient Number`[sampleParam['Sample'] == sample_name]
@@ -23,8 +22,9 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_
   ##################
   ## PCA
   ##################
+  #browser()
   PCA_dim = sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
-  visualize_PCA(data,folder,sample_name,PCA_dim)
+  visualize_PCA(data,folder,PCA_dim)
 
   pathName <- paste0(folder,'PCA/elbow_',PCA_dim,'.png')
   png(file=pathName,width=600, height=350)
@@ -42,12 +42,16 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_
   
   # Cluster with Umap
   ## ADD DOTPLOT
-  resolution_val<- sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
-  data = getCluster (data,resolution_val, PCA_dim)
+  resolution_val = sampleParam$resolution_val[sampleParam['Sample'] == sample_name]
+  #clusterTF = TRUE
+  if (clusterTF == TRUE){
+    data = getCluster (data,resolution_val, PCA_dim)
+  }
   
   
   # Name cells
   if (label_TF){
+    #browser()
     cluster_IDs <- sampleParam$Cluster_IDs[sampleParam['Sample'] == sample_name]
     #browser()
     data = label_cells(data,cluster_IDs)
@@ -58,20 +62,25 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_
   ## Get Cluster Stats
   ##############################
   
-  if (integrate_TF){
+  cluster_num = clusterStats(data@active.ident)
+  print(cluster_num)
+  write.csv(cluster_num, file = paste0(folder,'Stats/clusterStats',file_str,'.csv'),row.names = FALSE)
+  
+  
+  if (any(which(data$orig.ident == "data_pre"))){
     data_pre = data@active.ident[which(data$orig.ident == "data_pre")]
-    data_post = data@active.ident[which(data$orig.ident == "data_post")]
-    
-    cluster_num = clusterStats(data@active.ident)
     cluster_num_pre = clusterStats(data_pre)
-    cluster_num_post = clusterStats(data_post)
-    
-    print(cluster_num)
-    
-    write.csv(cluster_num, file = paste0(folder,'Stats/clusterStats',file_str,'.csv'),row.names = FALSE)
     write.csv(cluster_num_pre, file = paste0(folder,'Stats/clusterStats_pre',file_str,'.csv'),row.names = FALSE)
-    write.csv(cluster_num_post, file = paste0(folder,'Stats/clusterStats_post',file_str,'.csv'),row.names = FALSE)
+    
   }
+  
+  if (any(which(data$orig.ident == "data_post"))){
+    data_post = data@active.ident[which(data$orig.ident == "data_post")]
+    cluster_num_post = clusterStats(data_post)
+    write.csv(cluster_num_post, file = paste0(folder,'Stats/clusterStats_post',file_str,'.csv'),row.names = FALSE)
+    
+  }
+  
   ##############################
   ## Find Cluster Biomarkers
   ##############################
@@ -119,6 +128,8 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_
   print(filepath_cluster)
   dir.create( filepath_cluster, recursive = TRUE)
   
+  write.csv(all_markers, file = paste0(filepath_cluster,'AllFeatures',file_str,'_Patient',Patient_num,'.csv'),row.names=FALSE)
+  
   pathName <- paste0(filepath_cluster,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
   png(file=pathName,width=600, height=350, res = 100)
   print(DimPlot(data, reduction = "umap",label = TRUE,pt.size = 1))
@@ -135,11 +146,6 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_
   dev.off()
   
   
-  pathName <- paste0(filepath_cluster,'ClusterMetrics','.png')
-  png(file=pathName,width=600, height=350)
-  print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
-  dev.off()
-  
   if (integrate_TF){
     pathName <- paste0(filepath_cluster,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,'_split',file_str,'.png'))  
     png(file=pathName,width=600, height=350)
@@ -147,3 +153,5 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,integrate_TF,DE_
     dev.off()
   }
 }
+
+

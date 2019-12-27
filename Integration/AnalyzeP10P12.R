@@ -61,7 +61,7 @@ Features_dCD14_MonoVsn_label_Patient10 = Features_dCD14_MonoVsn_label_Patient10[
 Features_dCD14_MonoVsn_label_Patient10 = Features_dCD14_MonoVsn_label_Patient10[Features_dCD14_MonoVsn_label_Patient10$p_val_adj < 0.05, ]
 Features_dCD14_MonoVsn_label_Patient10 = levels(Features_dCD14_MonoVsn_label_Patient10$gene)
 
-DEgeneHLA = c(Features_CD14_MonoVsn_label_Patient10,Features_dCD14_MonoVsn_label_Patient10)
+DEgeneHLA = c(Features_dCD14_MonoVsn_label_Patient10)
 DEgeneHLA = DEgeneHLA[grep('HLA', DEgeneHLA)]
 #DEgeneHLA = "HLA-DMB"
 
@@ -171,7 +171,7 @@ filepath_analysis = paste0( folder_pre, 'Analysis/' )
 # view cell cycle scores and phase assignments
 #head(object)
 
-browser()
+#browser()
 
 patient_list = c(10, 5, 20, 12, 34, 28, 21, 31, 16, 51, 6, 40) # all
 
@@ -186,17 +186,23 @@ for(patient in patient_list){ # Patient numbers
   folder_output =  paste0( folder_pre, 'Analysis/FeaturePlot_HLA/' )
   dir.create( folder_output, recursive = TRUE)
   
-
-  data = loadRData(paste0(folder_pre,'data.Robj'))
+  PCA_dim = sampleParam_integrate$PCA_dim[sampleParam_integrate['Sample'] == sample_name_pre]
+  resolution_val<- sampleParam_integrate$resolution_val[sampleParam_integrate['Sample'] == sample_name_pre]
   cluster_IDs = sampleParam_integrate[['Cluster_IDs']][sampleParam_integrate['Patient Number'] == patient]
+  
+  data = loadRData(paste0(folder_pre,'data.Robj'))
+  
+  data = getCluster(data,resolution_val, PCA_dim)
+  
   data = label_cells(data,cluster_IDs)
   
-  browser()
+  
+  #browser()
   for (i in 1:(length(DEgeneHLA))){
     feature = as.character(DEgeneHLA[i])
     cell_str = paste0('patient_',patient)
     print(feature)
-    FeaturePlotFix(data, feature,folder_output,cell_str, split = TRUE, gene_TF = TRUE)
+    #FeaturePlotFix(data, feature,folder_output,cell_str, split = TRUE, gene_TF = TRUE)
   }
   
   data = AddModuleScore(object = data, features = list(DEgeneHLA),nbin = 25, ctrl = 7, name = 'HLA_Feature')
@@ -204,7 +210,7 @@ for(patient in patient_list){ # Patient numbers
   
   score_HLA = subset(score_HLA_orig, select = c(orig.ident,HLA_Feature1))
   cell_str = paste0('patient_',patient)
-  FeaturePlotFix(data, 'HLA_Feature1',folder_output,cell_str, split = TRUE, gene_TF = FALSE)
+  FeaturePlotFix(score_HLA, 'HLA_Feature1',folder_output,cell_str, split = TRUE, gene_TF = FALSE)
   
   
 

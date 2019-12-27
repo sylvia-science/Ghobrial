@@ -53,7 +53,7 @@ runPipelineSubset = function(data,folder_input,sample_name,sampleParam,filter,sc
   PCA_dim = sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
   data = RunPCA(data, features = VariableFeatures(object = data), npcs = PCA_dim)
 
-  data = visualize_dim(data,PCA_dim)
+  data = visualize_PCA(data,PCA_dim)
   #JackStrawPlot(data, dims = 1:PCA_dim)
   
   

@@ -13,7 +13,7 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   
   cell_features_file <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Cell_IDS.xlsx'
   cell_features <- read_excel(cell_features_file)
-  
+  #browser()
   #####################
   ## QC
   #####################
@@ -21,15 +21,17 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
                             ,sampleParam$RNA_features_max[sampleParam['Sample'] == sample_name])
   percent_mt <- sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
   print('hello')
-  data = quality_control(data,filter,nFeature_RNA_list,percent_mt,folder_input,sample_name)
+  data = quality_control(data,filter,nFeature_RNA_list,percent_mt,sample_name)
+  data = NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
   
   ########################
   # Get Variable Genes
   ########################
+  
   nfeatures_val = sampleParam$nfeatures_val[sampleParam['Sample'] == sample_name]
   data = FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_val)
 
-  pathName = paste0(folder_input,'QC/FindVariableFeatures',file_str,'.png')
+  pathName = paste0(folder_input,'QC Metrics/FindVariableFeatures',file_str,'.png')
   print(pathName)
   png(file=pathName,width=600, height=350, res = 100)
   print(VariableFeaturePlot(data) + ylim(0,10))
@@ -54,9 +56,9 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   # PCA
   PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
   data <- RunPCA(data, features = VariableFeatures(object = data), npcs = PCA_dim)
-  visualize_PCA(data,folder_input,sample_name,PCA_dim)
-  
-  data = visualize_dim(data,PCA_dim)
+  visualize_PCA(data,folder_input,PCA_dim)
+
+  #data = visualize_dim(data,PCA_dim)
   #JackStrawPlot(data, dims = 1:PCA_dim)
   
   
@@ -109,23 +111,25 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   
   write.csv(top20, file = paste0(folder_input,'Top20Features',file_str,'.csv'),row.names=FALSE)
   #browser()
-  # Plot Umap
-  pathName <- paste0(folder_input,paste0('Cluster/ClusterUmap',resolution_val,file_str,'.png'))
+  
+  filepath_cluster = paste0( folder_input, 'Cluster/', 'PCA',PCA_dim,'/res',resolution_val,'/' )
+  print('filepath_cluster')
+  print(filepath_cluster)
+  dir.create( filepath_cluster, recursive = TRUE)
+  
+  pathName <- paste0(filepath_cluster,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
   png(file=pathName,width=600, height=350, res = 100)
   print(DimPlot(data, reduction = "umap",label = TRUE,pt.size = 1))
   dev.off()
   
-  # Visualize clustering
-  # Cluster Metrics
-  pathName <- paste0(folder_input,'Cluster/ClusterMetrics.png')
+  pathName <- paste0(filepath_cluster,paste0('HeatMap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
+  png(file=pathName,width=1000, height=1200)
+  print(DoHeatmap(data, features = top10$gene))
+  dev.off()
+  
+  pathName <- paste0(filepath_cluster,'ClusterMetrics','.png')
   png(file=pathName,width=600, height=350)
   print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
-  dev.off()
-  # Cluster Heatmap
-  plot = DoHeatmap(data, features = top10$gene)
-  pathName <- paste0(folder_input,paste0('Cluster/HeatMap',resolution_val,file_str,'.png'))
-  png(file=pathName,width=1000, height=1200)
-  print(plot)
   dev.off()
   
   

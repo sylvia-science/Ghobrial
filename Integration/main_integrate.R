@@ -16,10 +16,9 @@ require(gridExtra)
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Functions.R')
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/FunctionsIntegrate.R')
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Integration/PlotAll.R')
-
 source('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Plot_func.R')
 
-run = FALSE
+run = TRUE
 
 folder_base_input <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/'
 folder_base_output <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/Integrate Pair/'
@@ -48,7 +47,7 @@ patient_list_dexaF = c(5,12, 16)
 patient_list_dexaT = c(10,20,34,28,21,31,51,6,40)
 
 redo = c( 20, 34, 28, 21, 31, 40)
-for(patient in 34){ # Patient numbers 
+for(patient in 28){ # Patient numbers 
   
   filter = TRUE
   regress_TF = TRUE
@@ -97,11 +96,14 @@ for(patient in 34){ # Patient numbers
     
     data_integrated = run_pipeline_integrate(folder_input,folder_output,sample_name_list,sampleParam_integrate)
     #browser()  
-    save(data_integrated,file=paste0(folder_pre,'data_',patient,'.Robj'))
+    
+    PCA_dim =  sampleParam_integrate$PCA_dim[sampleParam_integrate['Sample'] == sample_name_pre]
+    save(data_integrated,file=paste0(folder_output,'data_','PCA_dim',PCA_dim,patient,'.Robj'))
+    browser()
     param_output =  sampleParam_integrate[ sampleParam_integrate$Sample == sample_name_pre, ]
     write.csv(param_output, file = paste0(folder_output[1],'parameters.csv'),row.names=FALSE)
     
-    #MakeFeaturePlot(data_integrated,data_integrated_orig, cell_features = NA, split = FALSE)
+    MakeFeaturePlot(data_integrated,data_integrated_orig, cell_features = NA, split = FALSE)
     #data_integrated = label_cells(data_integrated,cluster_IDs)
     
     
@@ -116,13 +118,13 @@ for(patient in 34){ # Patient numbers
     print(paste0('folder: ', folder_output[1]))
     
     data = loadRData(paste0(folder_output[1],'data.Robj'))
-
+    
     #print(FeaturePlot(data, features))
     
     plotAll(data,folder_output[1],sample_name_pre,sampleParam_integrate, 
-            label_TF = FALSE, integrate_TF = TRUE, DE_perm_TF = TRUE)
-    plotAll(data,folder_output[1],sample_name_pre,sampleParam_integrate, 
-           label_TF =TRUE, integrate_TF = TRUE, DE_perm_TF = TRUE)
+            label_TF = FALSE, integrate_TF = TRUE, DE_perm_TF = FALSE)
+    #plotAll(data,folder_output[1],sample_name_pre,sampleParam_integrate, 
+           #label_TF =TRUE, integrate_TF = TRUE, DE_perm_TF = FALSE)
 
     PCA_dim = sampleParam_integrate$PCA_dim[sampleParam_integrate['Sample'] == sample_name_pre]
     resolution_val<- sampleParam_integrate$resolution_val[sampleParam_integrate['Sample'] == sample_name_pre]

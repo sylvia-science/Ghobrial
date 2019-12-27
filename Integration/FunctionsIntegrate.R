@@ -63,7 +63,7 @@ run_pipeline_integrate = function(folder_input,folder_output,sample_name_list,sa
   ######################
   
   #Visualize PCA results
-  visualize_PCA(data_integrated,folder_output[1],sample_name_list[1],PCA_dim)
+  visualize_PCA(data_integrated,folder_output[1],PCA_dim)
   
   print(folder_pre)
   pathName <- paste0(folder_output[1],'PCA/elbow',file_str,'.png')

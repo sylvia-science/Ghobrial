@@ -1,0 +1,154 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+```{r}
+library(png)
+library(readxl)
+library(knitr)
+library(cowplot)
+library(ggplot2)
+library(magick)
+```
+
+```{r, dpi=300}
+
+filename_sample_Combine_pairs <- paste0('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_Combine_pairs.xlsx')
+sample_Combine_pairs <- read_excel(filename_sample_Combine_pairs)
+
+
+sample_type = 'PrePostNBM'
+integrate_merge = 'Merge'
+folder_base_output = paste0('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/',integrate_merge ,' All/',sample_type,'/')
+  
+for (i in 1:22){
+  print(i)
+  if (sample_Combine_pairs$'Dexa or not'[i] != 'NBM'){
+    
+    sample_pre = sample_Combine_pairs$'Sample Pre BM'[i]
+    sample_post = sample_Combine_pairs$'Sample Post BM'[i]
+    
+    print(paste0('Dexa ',sample_Combine_pairs$'Dexa or not'[i]))
+    print(paste0('Sample Pre:',sample_pre ))
+    print(paste0('Sample Pre:',sample_post ))
+    
+    folder_input_pre = paste0(folder_base_output,'Samples Seperate/',sample_pre,'/Cluster/PCA20/res1/')
+    folder_input_post = paste0(folder_base_output,'Samples Seperate/',sample_post,'/Cluster/PCA20/res1/')
+    
+    filename_umap_pre = paste0(folder_input_pre,'ClusterUmap_PCA20_res1_label.png')
+    filename_heatmap_pre = paste0(folder_input_pre,'HeatMap_PCA20_res1_label.png')
+    
+    filename_umap_post = paste0(folder_input_post,'ClusterUmap_PCA20_res1_label.png')
+    filename_heatmap_post = paste0(folder_input_post,'HeatMap_PCA20_res1_label.png')
+    
+    label_list = c(paste0(sample_pre, ' Pre Dexa ',sample_Combine_pairs$'Dexa or not'[i] ),
+                   paste0(sample_post, ' Post Dexa ',sample_Combine_pairs$'Dexa or not'[i] ))
+    p1 <- ggdraw() + draw_image(filename_umap_pre, scale = 1) 
+    p2 <- ggdraw() + draw_image(filename_umap_post, scale = 1) 
+    plot = plot_grid(p1, p2,labels=label_list)
+    print(plot)
+    
+    p1 <- ggdraw() + draw_image(filename_heatmap_pre, scale = 1)
+    p2 <- ggdraw() + draw_image(filename_heatmap_post, scale = 1)
+    plot = plot_grid(p1, p2,labels=label_list)
+    print(plot)
+
+
+  }else{
+    
+    sample = sample_Combine_pairs$'Sample Pre BM'[i]
+
+    print(paste0('Dexa ',sample_Combine_pairs$'Dexa or not'[i]))
+    print(paste0('Sample: ',sample ))
+
+    folder_input_pre = paste0(folder_base_output,'Samples Seperate/',sample,'/Cluster/PCA20/res1/')
+
+    filename_umap_pre = paste0(folder_input_pre,'ClusterUmap_PCA20_res1_label.png')
+    filename_heatmap_pre = paste0(folder_input_pre,'HeatMap_PCA20_res1_label.png')
+
+    label_list = c(paste0(sample, ' ', sample_Combine_pairs$'Dexa or not'[i] ))
+    p1 <- ggdraw() + draw_image(filename_umap_pre, scale = 1) 
+    p2 <- ggdraw() + draw_image(filename_heatmap_pre, scale = 1) 
+    plot = plot_grid(p1, p2,labels=label_list)
+    print(plot)
+  
+
+  }
+      
+}
+    
+```
+
+```{r,dpi=300}
+filename_sample_Combine_pairs <- paste0('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_Combine_pairs.xlsx')
+sample_Combine_pairs <- read_excel(filename_sample_Combine_pairs)
+
+
+sample_type = 'PrePost'
+integrate_merge = 'Integrate'
+folder_base_output = paste0('C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Code/Output/',integrate_merge ,' All/',sample_type,'/')
+  
+for (i in 1:12){
+  print(i)
+  if (sample_Combine_pairs$'Dexa or not'[i] != 'NBM'){
+    
+    PCA = 15
+    res = 1
+    sample_pre = sample_Combine_pairs$'Sample Pre BM'[i]
+    sample_post = sample_Combine_pairs$'Sample Post BM'[i]
+    
+    print(paste0('Dexa ',sample_Combine_pairs$'Dexa or not'[i]))
+    print(paste0('Sample Pre:',sample_pre ))
+    print(paste0('Sample Pre:',sample_post ))
+    
+    folder_input_pre = paste0(folder_base_output,'Samples Seperate/',sample_pre,'/Cluster/PCA',PCA,'/res',res,'/')
+    folder_input_post = paste0(folder_base_output,'Samples Seperate/',sample_post,'/Cluster/PCA',PCA,'/res',res,'/')
+    
+    filename_umap_pre = paste0(folder_input_pre,'ClusterUmap_PCA',PCA,'_res',res,'_label.png')
+    filename_heatmap_pre = paste0(folder_input_pre,'HeatMap_PCA',PCA,'_res',res,'_label.png')
+    
+    filename_umap_post = paste0(folder_input_post,'ClusterUmap_PCA',PCA,'_res',res,'_label.png')
+    filename_heatmap_post = paste0(folder_input_post,'HeatMap_PCA',PCA,'_res',res,'_label.png')
+    
+    label_list = c(paste0(sample_pre, ' Pre Dexa ',sample_Combine_pairs$'Dexa or not'[i] ),
+                   paste0(sample_post, ' Post Dexa ',sample_Combine_pairs$'Dexa or not'[i] ))
+    p1 <- ggdraw() + draw_image(filename_umap_pre, scale = 1) 
+    p2 <- ggdraw() + draw_image(filename_umap_post, scale = 1) 
+    plot = plot_grid(p1, p2,labels=label_list)
+    print(plot)
+    
+    p1 <- ggdraw() + draw_image(filename_heatmap_pre, scale = 1)
+    p2 <- ggdraw() + draw_image(filename_heatmap_post, scale = 1)
+    plot = plot_grid(p1, p2,labels=label_list)
+    print(plot)
+
+
+  }else{
+    
+    sample = sample_Combine_pairs$'Sample Pre BM'[i]
+
+    print(paste0('Dexa ',sample_Combine_pairs$'Dexa or not'[i]))
+    print(paste0('Sample: ',sample ))
+
+    folder_input_pre = paste0(folder_base_output,'Samples Seperate/',sample,'/Cluster/PCA20/res1/')
+
+    filename_umap_pre = paste0(folder_input_pre,'ClusterUmap_PCA20_res1_label.png')
+    filename_heatmap_pre = paste0(folder_input_pre,'HeatMap_PCA20_res1_label.png')
+
+    label_list = c(paste0(sample, ' ', sample_Combine_pairs$'Dexa or not'[i] ))
+    p1 <- ggdraw() + draw_image(filename_umap_pre, scale = 1) 
+    p2 <- ggdraw() + draw_image(filename_heatmap_pre, scale = 1) 
+    plot = plot_grid(p1, p2,labels=label_list)
+    print(plot)
+  
+
+  }
+      
+}
+```
+
+
