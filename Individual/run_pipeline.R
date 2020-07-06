@@ -1,18 +1,38 @@
-run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,regress_TF){
-  print(sample_name)
+run_pipeline = function(data,folder_input,sample_name,sampleParam,filter,regress_TF){
   
+  #browser()
+  remove_NaN = F
+  if (remove_NaN){
+    # Remove cells with Nan values
+    tmp = data@assays[["RNA"]]@data
+    tmp = as.matrix(tmp)
+    cell_name = names(which(is.na(colSums(tmp))))
+    cell_val = colnames(data[["RNA"]]@data) != cell_name
+    colname_list = colnames(data[["RNA"]]@data)
+    # Stupid fix
+    for ( i in 1:length(colname_list)){
+      if(colname_list[i] %in% cell_name) {
+        cell_val[i] = F
+      }
+      
+    }
+    
+    #data_integrate_test = SubsetData(data, cells = cell_val)
+    if (length(cell_val)!= 0){
+      data = data[,cell_val]
+    }
+  }
+  #browser()
+  dir.create(folder_input,recursive = TRUE)
+  print(sample_name)
+  #browser()
   cluster_IDs = sampleParam$Cluster_IDs_post_regress[sampleParam['Sample'] == sample_name]
   
   file_str = ''
-  # Load data
-  filename_metaData <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Dexa_meta.xlsx'
-  filename_sampleParam <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/sample_parameters.xlsx'
-  metaData <- read_excel(filename_metaData)
-  sampleParam <- read_excel(filename_sampleParam)
-  data = load_data(filename)
   
-  cell_features_file <- 'C:/Users/Sylvia/Dropbox (Partners HealthCare)/Sylvia_Romanos/scRNASeq/Data/Cell_IDS.xlsx'
-  cell_features <- read_excel(cell_features_file)
+  
+  cell_features_file = '/home/sujwary/Desktop/scRNA/Data/Cell_IDS.xlsx'
+  cell_features = read_excel(cell_features_file)
   #browser()
   #####################
   ## QC
@@ -20,23 +40,25 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   nFeature_RNA_list <- list(sampleParam$RNA_features_min[sampleParam['Sample'] == sample_name]
                             ,sampleParam$RNA_features_max[sampleParam['Sample'] == sample_name])
   percent_mt <- sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
-  print('hello')
-  data = quality_control(data,filter,nFeature_RNA_list,percent_mt,sample_name)
-  data = NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
   
+  folder_input = makeFolders(folder_input,sample_name,filter,regress_TF, makeFolder_TF= TRUE,nFeature_RNA_list,percent_mt)
+  
+  print('hello')
+  data = quality_control(data,folder_input,filter,nFeature_RNA_list,percent_mt,sample_name)
+  data = NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
   ########################
   # Get Variable Genes
   ########################
   
   nfeatures_val = sampleParam$nfeatures_val[sampleParam['Sample'] == sample_name]
   data = FindVariableFeatures(data, selection.method = "vst", nfeatures = nfeatures_val)
-
+  
   pathName = paste0(folder_input,'QC Metrics/FindVariableFeatures',file_str,'.png')
   print(pathName)
   png(file=pathName,width=600, height=350, res = 100)
   print(VariableFeaturePlot(data) + ylim(0,10))
   dev.off()
-
+  
   ##########################################
   ## Score for Cell Cycle gene expression
   ##########################################
@@ -52,12 +74,12 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   }else{
     data <- ScaleData(data, features = rownames(data)) 
   }
-  
+  #browser()
   # PCA
   PCA_dim<- sampleParam$PCA_dim[sampleParam['Sample'] == sample_name]
   data <- RunPCA(data, features = VariableFeatures(object = data), npcs = PCA_dim)
   visualize_PCA(data,folder_input,PCA_dim)
-
+  
   #data = visualize_dim(data,PCA_dim)
   #JackStrawPlot(data, dims = 1:PCA_dim)
   
@@ -89,34 +111,29 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   top10 <- markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
   top20 <- markers %>% group_by(cluster) %>% top_n(n = 20, wt = avg_logFC)
   
-  top20$Cell = NA
-  # Add known markers to top20
-  #browser()
   
-  for (i in 1:nrow(top20)){
-    marker_rows = grep(top20$gene[i], cell_features$Markers, value=TRUE)
-    marker_idx = which( cell_features$Markers %in% marker_rows)
-    #browser()
-    if (length(marker_idx) > 0){
-      #browser()
-      cell_list = cell_features$Cell[marker_idx]
-      cell_list = paste(cell_list, sep="", collapse=", ") 
-      top20$Cell[i] = cell_list
-    }else if (length(marker_idx) == 0 ){
-      top20$Cell[i] = ''
-    }
-  }
-  
-  
-  
-  write.csv(top20, file = paste0(folder_input,'Top20Features',file_str,'.csv'),row.names=FALSE)
-  #browser()
   
   filepath_cluster = paste0( folder_input, 'Cluster/', 'PCA',PCA_dim,'/res',resolution_val,'/' )
   print('filepath_cluster')
   print(filepath_cluster)
   dir.create( filepath_cluster, recursive = TRUE)
+  # 
+  pathName <- paste0(filepath_cluster,paste0('HeatMap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
+  png(file=pathName,width=1000, height=1200)
+  print(DoHeatmap(data, features = top10$gene,label = F))
+  dev.off()
   
+  #browser()
+  
+  
+  # Add known markers
+  all_markers =  markers %>% group_by(cluster)
+  all_markers = cellMarkers(all_markers,cell_features)
+  write.csv(all_markers, file = paste0(filepath_cluster,'Features',file_str,'.csv'),row.names=FALSE)
+  #browser()
+  
+  
+  #browser()
   pathName <- paste0(filepath_cluster,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
   png(file=pathName,width=600, height=350, res = 100)
   print(DimPlot(data, reduction = "umap",label = TRUE,pt.size = 1))
@@ -124,7 +141,7 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   
   pathName <- paste0(filepath_cluster,paste0('HeatMap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
   png(file=pathName,width=1000, height=1200)
-  print(DoHeatmap(data, features = top10$gene))
+  print(DoHeatmap(data, features = top10$gene, label=FALSE))
   dev.off()
   
   pathName <- paste0(filepath_cluster,'ClusterMetrics','.png')
@@ -132,10 +149,6 @@ run_pipeline = function(filename,folder_input,sample_name,sampleParam,filter,reg
   print(FeaturePlot(data, features = c("S.Score", "G2M.Score", "nCount_RNA", "percent.mt")))
   dev.off()
   
-  
-  # Get gene Descriptions
-  #gene_desc_top10 =  get_gene_desc(top10)
-  #gene_desc_top10
   #########################################################################################
   
   

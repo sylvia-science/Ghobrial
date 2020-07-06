@@ -149,7 +149,7 @@ FeaturePlot_GeneList = function(data,gene_list,folder_base_output,folder_name,sa
         label_list = c('Pre ND','Pre D','Post ND','Post D')
         plot = plot_grid(plot_PreND, plot_PreD,plot_PostND,plot_PostD,labels=label_list)
 
-        pathName <- paste0(folder_featureplot,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,'_SplitFix',label_str,feature,'.png'))  
+        pathName <- paste0(folder_featureplot,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,'_',label_str,feature,'.png'))  
         png(file=pathName,width=1200, height=600)
         print(plot)
         dev.off()
@@ -191,6 +191,14 @@ FeaturePlot_GeneList = function(data,gene_list,folder_base_output,folder_name,sa
         dev.off()
         
       
+      }else if (sample_type == ''){
+        plot = FeaturePlotFix(data, feature,folder = '','', split = FALSE, gene_TF = TRUE,title = '',saveTF = FALSE)
+
+        pathName <- paste0(folder_featureplot,paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,'_',label_str,feature,'.png'))  
+        png(file=pathName,width=1200, height=600)
+        print(plot)
+        dev.off()
+        
       }
     }
   }

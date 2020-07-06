@@ -140,10 +140,11 @@ run_pipeline_integrate = function(folder_input,folder_output,sample_name_list,sa
 }
 
 ###################
-## Diff Expression
+## Permute
 ###################
 
 diff_exp = function(data_input, cell_type){
+  #browser()
   #Add active.ident to the metadata and convert to dataframe
   data_input@meta.data$active.ident <- data_input@active.ident
   data_permute <- data.frame(data_input@meta.data)
@@ -153,17 +154,27 @@ diff_exp = function(data_input, cell_type){
     all <- sample(data_input$orig.ident)
     newPre <- which(all == "data_pre")
     newPost <- which(all == "data_post")
-    diff <- (sum(data_permute$active.ident[newPost] %in% cell_type)/length(newPost)) 
-    - (sum(data_permute$active.ident[newPre] %in% cell_type)/length(newPre))
+    num_post = sum(data_permute$active.ident[newPost] %in% cell_type)
+    num_pre = sum(data_permute$active.ident[newPre] %in% cell_type)
+    diff = num_post/length(newPost) - (num_pre)/length(newPre)
     return(diff)
   })
   
+  #browser()
   #What's the proportion of differences that were larger than the observed difference?
-  obsdiff <- (sum(data_permute$active.ident[which(data_permute$orig.ident == "data_post")] 
-                  %in% cell_type)/sum(data_permute$orig.ident == "data_post")) 
-  - (sum(data_permute$active.ident[which(data_permute$orig.ident == "data_pre")] %in% cell_type)
-     /sum(data_permute$orig.ident == "data_pre"))
+  cell_post = sum(data_permute$active.ident[which(data_permute$orig.ident == "data_post")] %in% cell_type)
+  cell_pre = sum(data_permute$active.ident[which(data_permute$orig.ident == "data_pre")] %in% cell_type)
+  total_post = sum(data_permute$orig.ident == "data_post") # Total post
+  total_pre = sum(data_permute$orig.ident == "data_pre")
   
+  # Diff of fraction cell type in pre and fraction cell type in post
+  obsdiff <- (cell_post/total_post)  - cell_pre /total_pre
+  
+  # obsdiff <- (sum(data_permute$active.ident[which(data_permute$orig.ident == "data_post")] %in% cell_type)
+  #             /sum(data_permute$orig.ident == "data_post")) 
+  # - (sum(data_permute$active.ident[which(data_permute$orig.ident == "data_pre")] %in% cell_type)
+  #    /sum(data_permute$orig.ident == "data_pre"))
+  # 
   
   pval = (sum(abs(permuted_differences) > abs(obsdiff)) + 1) / (length(permuted_differences) + 1)
   return (c(obsdiff,pval))
@@ -246,7 +257,7 @@ diffExpPermute = function(data,cell_features){
     
     print(perm[i,])
     Features_mvn = FindMarkers(data, ident.1 = ident1, ident.2 = ident2
-                               ,min.pct = 0.2, logfc.threshold = 0.2, only.pos = TRUE)
+                               ,min.pct = 0.1, logfc.threshold = 0.01, only.pos = TRUE)
     Features_mvn$gene = rownames(Features_mvn)
     rownames(Features_mvn) = NULL
     Features_mvn = cellMarkers(Features_mvn,cell_features)

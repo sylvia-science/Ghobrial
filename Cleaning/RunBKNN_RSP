@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri May 29 20:11:47 2020
+
+@author: sujwary
+"""
+
+import pandas as pd
+import numpy as np
+from scipy import io
+import scipy.sparse
+from numpy import savetxt
+import bbknn
+from scipy.sparse import csr_matrix
+import os
+import scanpy as sc
+import anndata
+i#mport igraph as ig
+import scanpy.external as sce
+
+folder_input = ('/home/sujwary/Desktop/scRNA/Output/BBKNN/baseline' + '/')
+path = folder_input +'MergeCounts.csv'
+counts = pd.read_csv(path,index_col=0)
+
+batch_list = np.genfromtxt((folder_input  +'baseline_sample.txt'), dtype=str)
+batch_list_df = pd.DataFrame(batch_list, index = counts.T.index).rename(columns={0: "batch"})
+
+path = folder_input +'baseline_PCA.csv'
+pca_matrix = pd.read_csv (path,index_col=0)
+
+adata = anndata.AnnData(X = counts)
+adata = anndata.AnnData(X=pca_matrix, obs=batch_list_df)
+#sc.tl.pca(adata)
+
+adata.obsm['X_pca'] = pca_matrix
+
+adata_bbknn = bbknn.bbknn(adata, neighbors_within_batch=5, n_pcs=100, trim=0, copy=True, batch_key = 'batch')
+
+#sce.pp.bbknn(adata, batch_key='batch')
+
+#sc.pp.neighbors(adata)
+sc.tl.louvain(adata_bbknn,resolution = 1)
+sc.tl.umap(adata)

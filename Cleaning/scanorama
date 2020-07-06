@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon May 25 18:43:56 2020
+
+@author: sujwary
+"""
+import pandas as pd
+import numpy as np
+from scipy import io
+import scanorama
+from scipy.sparse import csr_matrix
+import os
+filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
+metaData = pd.read_excel(filename_metaData)
+metaData = metaData[metaData['Run']== 1]
+
+sample_list = ['GL2923BM', 'GL3404BM', 'NBM6CD138N']
+
+
+#sample_list = c('GL3404BM')
+i = 1
+
+patient_list = [12, 16, 20]
+
+for i in range(0,len(patient_list)):
+    patient = patient_list[i]
+    
+    datasets = [None]*2 #List of data sets (matrices of cells-by-genes):
+    genes_list = [None]*2 # List of gene lists:
+    sample_name_baseline = metaData['Sample'][(metaData['Patient Number'] == patient) &  (metaData['Treatment'] == 'baseline')]
+    sample_name_baseline=  sample_name_baseline.iloc[0]
+    print(sample_name_baseline)
+    folder_input = ('/home/sujwary/Desktop/scRNA/Output/Soup_MT_C100/' + sample_name_baseline + '/')
+    sparsematrix = io.mmread(folder_input +sample_name_baseline +'_matrix.txt')
+    row_names = np.genfromtxt((folder_input + sample_name_baseline +'_rownames.txt'), dtype=str)
+    sparsematrix_T = csr_matrix(np.transpose(sparsematrix))
+    datasets[0] = sparsematrix_T
+    genes_list[0] = list(row_names)
+    
+    sample_name_C9D1 = metaData['Sample'][(metaData['Patient Number'] == patient) &  (metaData['Treatment'] == 'C9D1')]
+    sample_name_C9D1=  sample_name_C9D1.iloc[0]
+    print(sample_name_C9D1)
+    folder_input = '/home/sujwary/Desktop/scRNA/Output/Soup_MT_C100/' + sample_name_C9D1 + '/'
+    sparsematrix = io.mmread(folder_input + sample_name_C9D1 +'_matrix.txt')
+    row_names = np.genfromtxt((folder_input +sample_name_C9D1 +'_rownames.txt'), dtype=str)
+    sparsematrix_T = csr_matrix(np.transpose(sparsematrix))
+    datasets[1] = sparsematrix_T
+    genes_list[1] = list(row_names)
+    
+    tmp = list(set(genes_list[0]) & set(genes_list[1])) 
+    
+    integrated, corrected, genes = scanorama.correct(datasets, genes_list, return_dimred=True)
+    
+    # use scanpy to get cell cycle scoring
+    path_base = '/home/sujwary/Desktop/scRNA/Output/Scanorama/'+ str(patient) + '/'
+    try:
+        os.makedirs(path_base)
+    except OSError:
+        print ("Creation of the directory %s failed" % path_base)
+    else:
+        print ("Successfully created the directory %s" % path_base)
+    filename0 =  path_base + sample_name_baseline + '.csv'  
+    filename1 =  path_base + sample_name_C9D1 + '.csv'  
+    np.savetxt( filename0, corrected[0],delimiter=',')
+    np.savetxt( filename1, corrected[1],delimiter=',')
+    
+
+
+   
+# Baseline samples
