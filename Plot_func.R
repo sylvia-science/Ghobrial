@@ -71,7 +71,7 @@ visualize_PCA = function(data,folder,PCA_dim, reduction = 'pca'){
   png(file=pathName,width=600, height=350)
   print(VizDimLoadings(data, dims = 1:2, reduction =reduction))
   dev.off()
-  
+  max_PC = ncol(data@reductions[[reduction]])
   
   ## JackStrawPlot
   # TO DO: Check if JackStrawPlot already exists with more dimensions
@@ -85,7 +85,7 @@ visualize_PCA = function(data,folder,PCA_dim, reduction = 'pca'){
     dev.off()
   }
   
-  for (i in 1:PCA_dim ){
+  for (i in 1:max_PC ){
     
     pathName <- paste0(folder,paste0('PCA/',reduction,'_','DimHeatMap_',i,'.png'))
     png(file=pathName,width=2000, height=1000, res=300)
@@ -102,7 +102,7 @@ visualize_PCA = function(data,folder,PCA_dim, reduction = 'pca'){
   #data <- CellCycleScoring(data, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
   
   print(PCA_dim)
-  for (x in 1:(PCA_dim -1)){
+  for (x in 1:(max_PC -1)){
     
     y <- x+1
     pathName <- paste0(folder,'PCA/',reduction,x,'_',y,'.png')
@@ -170,8 +170,9 @@ PlotKnownMarkers = function(data,
     x = unlist(strsplit(feature_list[i], ",")) 
     #x = gsub("\\s", "", x)  whitespace <- " \t\n\r\v\f"
     x = trimws(x, which = c("both"), whitespace = " \t\n\r\v\f")
-    x = gsub("\\W", "", x)
-
+    x = gsub(" ", "", x)
+    #x = gsub("\\W", "", x)
+    #browser()
 
     gene_list = (x[x %in% all_markers])  
     # FeaturePlot gives error if no genes are found, so we have to check if they are included in the highly variable gene list
@@ -581,7 +582,7 @@ DoHeatMapHelper = function(data_run,folder_base_output,folder_heatMap = NA, Feat
 
 ###################
 
-CompareCellNum = function(data,folder,split_var,metaData){
+CompareCellNum = function(data,stats_category,folder,split_var,metaData){
   browser()
   
   
@@ -590,37 +591,9 @@ CompareCellNum = function(data,folder,split_var,metaData){
   category_list = unique(data@meta.data[,split_var])
   
   cell_type_list = sort(as.character(unique(Idents(data))))
-  stats_category = data.frame(matrix(ncol = length(cell_type_list) + 1, nrow = 0))
-  colnames(stats_category) = c(cell_type_list, 'category')
-  
-  cnt = 1
-  for (category in category_list){ 
-    
-    data_subset_category = SubsetData(object = data, cells = data@meta.data[,split_var] == category )
-    sample_list = sort(unique(data_subset_category@meta.data[,'sample_name'] ))
-    #cell_type_list = sort(as.character(unique(Idents(data_subset_category))))
-    
-    stats_df = data.frame(matrix(ncol = length(cell_type_list) + 1, nrow = length(sample_list)))
-    colnames(stats_df) = c(cell_type_list, 'category')
-    rownames(stats_df) = sample_list
-    #browser()
-    
-    for (sample in sample_list){
-      
-      #browser()
-      data_subset_sample = SubsetData(object = data_subset_category, cells = data_subset_category$sample_name == sample )
-      
-      stats = clusterStats(data_subset_sample)
-      stats_df[sample,1:length(cell_type_list)] = stats$Percent
-      stats_df$category = category
-      #stats_df$cell_num = length(data_subset_sample@assays[["integrated"]]@data@p)
-      #browser()
-    }
-    #browser()
-    stats_category = rbind(stats_category,stats_df)
-    cnt = cnt + 1
-  }
-  
+
+
+
   browser()
   cell_list = c("T Cell", "CD8+ T Cell", "HSC","NK","Mature B Cell", 
                 "Immature B Cell", "CD16+ Mono", "pDC",'Erythrocyte','CD14+CD16+ Mono','Pre B Cell','DC')
@@ -648,6 +621,7 @@ CompareCellNum = function(data,folder,split_var,metaData){
       #browser()
       
       stats_summary = rbind(stats_category[[1]][, c(cell,'category')],stats_category[[2]][, c(cell,'category')],stats_category[[3]][, c(cell,'category')])
+      browser()
       stats_summary$category = factor(stats_summary$category , levels = category_list)
       stats_summary$Sample = rownames(stats_summary)
       stats_summary =merge(stats_summary, metaData, by = 'Sample')
@@ -966,11 +940,12 @@ CompareCellNum = function(data,folder,split_var,metaData){
       print(max_val)
       
       
-      
-      stats_summary = stats_category[, c(cell,'category')]
+      browser()
+      stats_summary = stats_category[cell]
       
       stats_summary$Sample = rownames(stats_summary)
       stats_summary =merge(stats_summary, metaData, by = 'Sample')
+      stats_summary$Response = metaData$Best_Overall_Response[metaData$Sample %in% stats_summary$Sample ]
       #browser()
       stats_summary$Response = gsub("Minimal Response then Progression", "TMP", stats_summary$Response )
       stats_summary$Response = gsub("Minimal Response", "TMP", stats_summary$Response )
@@ -989,15 +964,11 @@ CompareCellNum = function(data,folder,split_var,metaData){
       ###############
       #browser()
       # Just pre and post
-      category1 = 'baseline'
-      category2 = 'C9D1'
-      category3 = 'EOT'
-      stats_summary_line = stats_summary[(stats_summary$category == category1 | 
-                                            stats_summary$category == category2 | 
-                                            stats_summary$category == category3 ),]
-      stats_summary_line$category = as.character(stats_summary_line$category)
-      category_levels = c('baseline', 'C9D1','EOT')
-      category_levels = unique(stats_summary_line$category)
+
+      category_levels = c('baseline','C9D1','EOT' )
+      stats_summary$category = as.character(stats_summary$Treatment)
+      stats_summary_line = stats_summary[stats_summary$category %in% category_levels,]
+    
       stats_summary_line$category = factor(stats_summary_line$category, levels  = category_levels)
       stats_summary_line$Patient = stats_summary_line$`Patient Number`
       
@@ -1011,7 +982,7 @@ CompareCellNum = function(data,folder,split_var,metaData){
         geom_point(color="black", size=2) +
         geom_line(aes(group=Patient, color=stats_summary_line$Response,alpha = Response ), size = 1) +
         #scale_colour_manual(values=c(category1="blue",category2="red"))+
-        scale_alpha_manual(values = c( 0.9, 0.9,0.9))+
+        #scale_alpha_manual(values = c( 0.9, 0.9,0.9))+
         guides(alpha = FALSE)+
         labs(color = "Response")+
         theme_classic()
@@ -1189,3 +1160,46 @@ StackedVlnPlotHelper = function(data,gene_list,folder_heatMap,filename){
     dev.off()
   }
 }
+
+plotGeneScatter = function(data,gene1,gene2){
+  print(gene1)
+  print(gene2)
+  gene1_list = as.numeric(data@assays[["RNA"]]@data[gene1,])
+  gene2_list = as.numeric(data@assays[["RNA"]]@data[gene2,])
+  data_plot = data.frame(cbind(gene1_list,gene2_list))
+  colnames(data_plot) = c(gene1,gene2)
+  #browser()
+  
+  pathName <- paste0(filepath_cluster,paste0('/','Scatter_',gene1,'_Vs_',gene2,'.png'))
+  png(file=pathName,width=800, height=800,res = 150)
+  plot = ggplot(data_plot,aes_string(gene1,gene2)) +  
+    geom_point(aes(colour = data$GeneralCellType), size = 1) + 
+    theme_classic()
+  print(plot)
+  dev.off()
+  
+}
+
+FeaturePlot_GeneList = function(data,gene_list,folder, FeaturePlotFix = T,str = ''){
+  #browser()
+  folder = paste0(folder,'GeneList/')
+  dir.create(folder,recursive = T)
+  if (FeaturePlotFix){
+    for (j in 1:length(gene_list)){
+      gene = gene_list[j]
+      print(gene)
+      #browser()
+      plot = FeaturePlotFix(data, feature = gene,folder = '',str = '', markerSize = 1,
+                            split = F, gene_TF = TRUE,title = '',saveTF = FALSE) 
+      #str = ''
+      pathName = paste0(folder,str,'',gene,'.png')
+      png(filename = pathName,width=1000, height=1000, res=100)
+      print(plot)
+      dev.off()
+      remove(plot)
+      
+    }
+  }
+}
+  
+  

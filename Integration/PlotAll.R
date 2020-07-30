@@ -72,9 +72,10 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,
   ##################
   #browser()
   reduction = 'pca'
-  #reduction = 'harmony'
-  visualize_PCA(data,folder,PCA_dim,reduction)
+  reduction = 'harmony'
+  
   if (F){
+    visualize_PCA(data,folder,PCA_dim,reduction)
     dir.create( paste0(folder,'PCA'), recursive = TRUE)
     pathName <- paste0(folder,'PCA/elbow_',PCA_dim,'.png')
     png(file=pathName,width=600, height=350)
@@ -143,9 +144,27 @@ plotAll = function(data,folder,sample_name,sampleParam,label_TF,
   #browser()
   pathName <- paste0(filepath_cluster,
                      paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,file_str,'.png'))
-  png(file=pathName,width=1000, height=1000, res = 100
-      )
-  print(DimPlot(data,pt.size = 0.3, reduction = "umap",label = TRUE,label.size = 4))
+  png(file=pathName,width=2500, height=1500, res = 100)
+  plot = DimPlot(data,pt.size = 0.7, reduction = "umap",label = TRUE,label.size = 8)
+  plot = plot + theme(
+    legend.title = element_text( size = 24),
+    legend.text = element_text( size = 24))
+  plot = plot +theme(axis.text=element_text(size=24),
+                     axis.title=element_text(size=24,face="bold"))
+  print(plot)
+  dev.off()
+  
+  pathName <- paste0(filepath_cluster,
+                     paste0('ClusterUmap', '_PCA',PCA_dim,'_res',resolution_val,'_No_label',file_str,'.png'))
+  png(file=pathName,width=2500, height=1500, res = 100)
+  plot = DimPlot(data,pt.size = 0.7, reduction = "umap",label = F,label.size = 8)
+  plot = plot + theme(
+    legend.title = element_text( size = 24),
+    legend.text = element_text( size = 24))
+  plot = plot +theme(axis.text=element_text(size=24),
+               axis.title=element_text(size=24,face="bold"))
+  
+  print(plot)
   dev.off()
   
   

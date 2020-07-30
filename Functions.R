@@ -199,6 +199,32 @@ ConvertCellMarkers = function(cellMarker){
   return(output)
 }
 
+SummariseSampleByCell = function(data){
+  #browser()
+  sample_list = unique(data$sample)
+  celltype_list = unique(Idents(data))
+  output = data.frame(matrix(ncol = length(celltype_list), nrow = length(sample_list)))
+  colnames(output) = celltype_list
+  rownames(output) = sample_list
+  
+  
+  for (sample in sample_list){
+    for (celltype in celltype_list){
+      if (length(data$sample == sample & Idents(data) == celltype)  > 0){
+      #browser()
+      output[sample,celltype] = sum(data$sample == sample & Idents(data) == celltype)
+      }else{
+        output[sample,celltype]  = 0  
+      }
+    }
+  }
+  
+  
+  
+  
+  return(output)
+}
+
 getCellMarkers = function(folder){
   #browser()
   cell_features_file = paste0(folder,'Data/Cell_IDS.xlsx')
@@ -333,3 +359,12 @@ RemoveNan = function(data, slot){
   
 }
 
+renameCells = function(data, idents,newident){
+  #browser()
+  newIdents = as.character(Idents(data))
+  newIdents[newIdents %in% idents] = newident
+  print(unique(newIdents))
+  Idents(data) = newIdents
+  return(data)
+  
+}

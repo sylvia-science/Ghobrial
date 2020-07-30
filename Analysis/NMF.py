@@ -5,8 +5,11 @@ import pandas as pd
 # RUN SIGNATURE ANALYZER
 # ---------------------
 
-input_matrix = pd.read_csv("/home/sujwary/Desktop/scRNA/Data/NMF/PrePostEOTNBM_MT15_TCell.tsv", sep='\t')
-sa.run_matrix(matrix=input_matrix, outdir='/home/sujwary/Desktop/scRNA/Data/NMF/PrePostEOTNBM_MT15_TCell_phi1_alpha10', nruns=100,verbose=True,plot_results=False,K0=20,tolerance=1e-6,objective='gaussian', max_iter=30000, phi=1.0, a=10.0)
+celltype = 'T Cell'
+celltype = ''
+path = "/home/sujwary/Desktop/scRNA/Data/NMF/Harmony_AllSamples_Sample_Kit" + celltype
+input_matrix = pd.read_csv(path + ".tsv", sep='\t')
+sa.run_matrix(matrix=input_matrix, outdir= path + '_phi1_alpha10/', nruns=100,verbose=True,plot_results=False,K0=20,tolerance=1e-6,objective='gaussian', max_iter=30000, phi=1.0, a=10.0)
  
 
 

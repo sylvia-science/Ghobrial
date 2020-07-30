@@ -35,7 +35,6 @@ for (i in 1:nrow(metaData) ){
   
   pk_val = 0.15
   folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_Empty_MT_DoubletFinder','/',sample_name,'/','pk_',pk_val,'/')
-  
   file=paste0(folder, 'Doublet',pk_val,'.csv')
   doublet_data = read.csv(file)
   
@@ -44,12 +43,6 @@ for (i in 1:nrow(metaData) ){
   data_soup = loadRData(path)
   data_i_run = data_soup
   
-  
-  
-  data_i_run$emptyProb = br_e_sorted$LogProb
-  data_i_run$is_cell = br_e_sorted$is_cell
-  
-  data_i_run = data_i_run[,data_i_run$is_cell]
   data_i_run = data_i_run[, data_i_run$percent.mt < percent_mt]
   
   data_i_run$Scrublet_Boolean = as.logical(as.character(toupper(scrb$Scrublet_Boolean)))

@@ -45,7 +45,7 @@ for (i in 1:nrow(metaData) ){
   doublet_quantile_log =  quantile(doublet_log,0.925) 
   hist(doublet_log,breaks=20)
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','SCDS/',sample_name,'/')
+  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_SCDS/',sample_name,'/')
   dir.create(folder, recursive = T)
   scds_doublet = doublet_log > doublet_quantile_log
   write.csv(scds_doublet, file=paste0(folder, 'Doublet','.csv'))

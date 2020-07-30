@@ -41,16 +41,11 @@ for (i in 1:nrow(metaData) ){
   file=paste0(folder, 'Doublet',pk_val,'.csv')
   doublet_finder = read.csv(file)
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','scran_Doublet/',sample_name,'/')
+  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_scran_Doublet/',sample_name,'/')
   scran_doublet = read.csv(paste0(folder, 'Doublet','.csv'))
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','SCDS/',sample_name,'/')
+  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_SCDS/',sample_name,'/')
   scds_doublet = read.csv(paste0(folder, 'Doublet','.csv'))
-  
-  
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/C100_Soup_MT/',sample_name,'/')
-  path = paste0(folder,'/',sample_name,'_data.Robj')
-  #data_i_run = loadRData(path)
   
   
   doublet_summary = data.frame(matrix(ncol = 6, nrow = nrow((scds_doublet))))

@@ -46,7 +46,13 @@ load_emptyDrops <- function(data) {
 
 
 load_Doublets <- function(data) {
+  data$scrublet = F
+  data$doublet_finder = F
+  data$scran_doublet = F
+  data$scds_doublet = F
   data$Doublet = F
+  data$Doublet2Methods = F
+  data$Doublet3Methods = F
   data$doublet_scores = NA
   data$predicted_doublet_scrub = F
   sample_list = unique(data$sample)
@@ -71,7 +77,14 @@ load_Doublets <- function(data) {
     doublet = doublet[match(cell_names_sample,cell_names_all),]
     
     #browser()
+    #browser()
+    data$scrublet[data$sample == sample_name] = doublet$scrublet
+    data$doublet_finder[data$sample == sample_name] = doublet$doublet_finder
+    data$scran_doublet[data$sample == sample_name] = doublet$scran_doublet
+    data$scds_doublet[data$sample == sample_name] = doublet$scds_doublet
     data$Doublet[data$sample == sample_name]  = as.logical(as.character(toupper(doublet$Summary >= 2)))
+    data$Doublet2Methods[data$sample == sample_name]  = as.logical(as.character(toupper(doublet$Summary >= 2)))
+    data$Doublet3Methods[data$sample == sample_name]  = as.logical(as.character(toupper(doublet$Summary >= 3)))
     #data$doublet_scores[data$sample == sample_name]  = scrb$doublet_scores
     #data$predicted_doublet_scrub[data$sample == sample_name]  = as.logical(as.character(toupper(scrb$predicted_doublet)))
     
