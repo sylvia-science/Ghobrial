@@ -5,9 +5,9 @@ import pandas as pd
 # RUN SIGNATURE ANALYZER
 # ---------------------
 
-celltype = 'T Cell'
+celltype = 'Stem_Cell'
 celltype = ''
-path = "/home/sujwary/Desktop/scRNA/Data/NMF/Harmony_AllSamples_Sample_Kit" + celltype
+path = "/home/sujwary/Desktop/scRNA/Data/NMF/Harmony_AllSamples_Sample_Kit_" + celltype
 input_matrix = pd.read_csv(path + ".tsv", sep='\t')
 sa.run_matrix(matrix=input_matrix, outdir= path + '_phi1_alpha10/', nruns=100,verbose=True,plot_results=False,K0=20,tolerance=1e-6,objective='gaussian', max_iter=30000, phi=1.0, a=10.0)
  

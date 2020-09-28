@@ -23,6 +23,10 @@ library(SingleCellExperiment)
 library(MAST)
 library(UpSetR)
 library(SingleCellSignalR)
+library(fgsea)
+data(examplePathways)
+data(exampleRanks)
+
 
 
 source('/home/sujwary/Desktop/scRNA/Code/Functions.R')
@@ -62,6 +66,9 @@ cluster_id_param = read_excel(filename)
 filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
 metaData = read_excel(filename_metaData)
 metaData = metaData[metaData$Run== 1,]
+#metaData = metaData[metaData$`Sample Type` == 'PBMC',]
+#metaData = metaData[rowSums(is.na(metaData)) != ncol(metaData), ]
+
 
 sampleParam = sampleParam[sampleParam$Sample %in% metaData$Sample,]
 
@@ -73,11 +80,19 @@ downsample  = NA #downsample$x
 
 
 sample_type = 'Harmony_AllSamples_Sample_Kit'
+#sample_type = 'Harmony_PBMC_Sample_Kit'
+
+folder_name = 'AllSamples'
+#folder_name = 'PBMC'
+
 PCA_dim = sampleParam_combine$PCA_dim[sampleParam_combine['Sample'] == sample_type]
 resolution_val = sampleParam_combine$resolution_val[sampleParam_combine['Sample'] == sample_type]
 cluster_IDs = sampleParam_combine$Cluster_IDs[sampleParam_combine['Sample'] == sample_type] 
 cluster_IDs_subset =sampleParam_combine$Cluster_IDs[sampleParam_combine['Sample'] == paste0(sample_type,'_',celltype)]
- 
+resolution_val_subset = sampleParam_combine$resolution_val[sampleParam_combine['Sample'] == paste0(sample_type,'_',celltype)]
+
+harmony_dim_subset = sampleParam_combine$harmony_dim[sampleParam_combine['Sample'] == paste0(sample_type,'_',celltype)]
+
 patient_list = c(12, 16, 20)
 
 i = 1
@@ -87,7 +102,7 @@ Samples_runs = read_excel(filename_testIntRun)
 
 #folder = 'Intra-v3_1'
 #folder = 'Inter-version'
-folder_name = 'AllSamples'
+
 #folder_name = 'AllSamplesDownsample'
 #sample_list = Samples_runs$Samples[Samples_runs$Folder== folder]
 #sample_list = unlist(strsplit(sample_list, ",")) 
@@ -105,12 +120,17 @@ dir.create(filepath_cluster,recursive = T)
 
 run = F
 
+folder_subcluster = paste0(folder_main, 'Subcluster/',celltype,'/')
+
 
 if (run){
   path = paste0(folder_main,'data_run','.Robj')
   data_orig = loadRData(path)
   data_orig =label_cells(data_orig,cluster_IDs)
   data_orig = data_orig[,Idents(data_orig) %in% cell_list]
+  plot = DimPlot(data_orig,pt.size = 0.7, reduction = "umap",label = TRUE,label.size = 8)
+  print(plot)
+  
   cell_names_all = colnames(data_orig)
   cell_names_all = sub("_.*", "", cell_names_all)
   data_orig$cell_sample = paste0(cell_names_all,' ',data_orig$sample )
@@ -128,16 +148,32 @@ if (run){
   data_run_subset = ScaleData(data_run_subset)
   data_run_subset = RunPCA(data_run_subset,npcs = 40)
   
-  data_run_subset = RunHarmony(data_run_subset,group.by.vars =  c("sample", "10X kit"),
-                              dims.use = 1:30)
+  reduction = 'pca'
+  visualize_PCA(data_run_subset,folder_subcluster,40,reduction)
+  dir.create( paste0(folder_subcluster, reduction), recursive = TRUE)
+  pathName <- paste0(folder_subcluster,reduction,'/elbow_',PCA_dim,'.png')
+  png(file=pathName,width=600, height=350)
+  print(ElbowPlot(data_run_subset,ndims = PCA_dim))
+  dev.off()
   
-  data_run_subset = RunUMAP(reduction = "harmony",data_run_subset, dims = 1:30)
-  data_run_subset = FindNeighbors(data_run_subset, reduction = "harmony", dims = 1:30)
+  data_run_subset = RunHarmony(data_run_subset,group.by.vars =  c("sample", "10X kit"),
+                              dims.use = 1:harmony_dim_subset)
+  
+  reduction = 'harmony'
+  visualize_PCA(data_run_subset,folder_subcluster,harmony_dim_subset,reduction)
+  dir.create( paste0(folder_subcluster, reduction), recursive = TRUE)
+  pathName <- paste0(folder_subcluster,reduction,'/elbow_',PCA_dim,'.png')
+  png(file=pathName,width=600, height=350)
+  print(ElbowPlot(data_run_subset,ndims = harmony_dim_subset))
+  dev.off()
+  
+  
+  data_run_subset = RunUMAP(reduction = "harmony",data_run_subset, dims = 1:harmony_dim_subset)
+  data_run_subset = FindNeighbors(data_run_subset, reduction = "harmony", dims = 1:harmony_dim_subset)
   data_run_subset = FindClusters(data_run_subset,resolution = resolution_val_subset)
   data_run_subset$origIdent = Idents(data_orig)
   
   
-  folder_subcluster = paste0(folder_main, 'Subcluster/',celltype,'/')
   dir.create(folder_subcluster,recursive = T)
   path = paste0(folder_subcluster,'data_run','.Robj')
   save(data_run_subset,file= path)
@@ -146,14 +182,20 @@ if (run){
   folder_subcluster = paste0(folder_main, 'Subcluster/',celltype,'/')
   path = paste0(folder_subcluster,'data_run','.Robj')
   data_run_subset = loadRData(path)
-  Idents(data_run_subset) = data_run_subset@meta.data[paste0('RNA_snn_res.', resolution_val_subset)]
+  tmp = data_run_subset@meta.data[paste0('RNA_snn_res.', resolution_val_subset)]
+  tmp = tmp[,1]
+  tmp  =factor(tmp,levels = as.character(0:(length(unique(tmp))-1)))
+  Idents(data_run_subset) = tmp
   
-  data_run_subset = FindClusters(data_run_subset,resolution = resolution_val_subset)
+  #data_run_subset = FindClusters(data_run_subset,resolution = resolution_val_subset)
+  plot = DimPlot(data_run_subset,pt.size = 0.7, reduction = "umap",label = TRUE,label.size = 8)
+  print(plot)
   
 }
 gene_name_vector= rownames(data_run_subset)
 gene_name_vector[grep("HLA-DR", gene_name_vector)]
 gene_list = 'LY6C1, LY6G6D, MMP9, TIMP1, LGALS3, S100A6, S100A11, ISG15, MS4A4C'
+gene_list = 'NCR2'
 gene_list = unlist(strsplit(gene_list, ",")) 
 gene_list = trimws(gene_list, which = c("both"), whitespace = "[ \t\r\n]")
 gene_list [ !(gene_list %in% gene_name_vector )]
@@ -171,7 +213,7 @@ cell_features = getCellMarkers('/home/sujwary/Desktop/scRNA/')
 
 groupBy_list = c('sample','Diagnosis','kit',
                  'Treatment','Batch','LowCount',
-                 'Doublet','GeneralCellType','FeatureLessThan400','origIdent')
+                 'Doublet','GeneralCellType','FeatureLessThan400')
 #groupBy_list = c('sample')
 featurePlot_list = c('percent.mt','nCount_RNA','G2M.Score','S.Score')
 splitBy_list = NA
@@ -180,47 +222,107 @@ filepath_cluster = paste0( folder_subcluster, 'Cluster/', 'PCA',30,'/res',resolu
 
 cell_features_file = paste0('/home/sujwary/Desktop/scRNA','/Data/Cell_IDS.xlsx')
 cell_features = read_excel(cell_features_file)
-
+plot = DimPlot(data_run_subset_label,pt.size = 0.7, reduction = "umap",label = TRUE,label.size = 8)
+print(plot)
 
 
 plotAll(data_run_subset, folder = folder_subcluster,
         sample_name,sampleParam = NA,
         cell_features = cell_features,
-        label_TF = F,integrate_TF = F,  DE_perm_TF =T, 
-        clusterTF =F, markersTF = F, 
+        label_TF = F,integrate_TF = F,  DE_perm_TF =F, 
+        clusterTF =F, markersTF = T, 
         groupBy = groupBy_list, splitBy = splitBy_list,featurePlot_list = featurePlot_list,
-        PCA_dim = 30,resolution_val = resolution_val_subset)
+        PCA_dim = 30,resolution_val = resolution_val_subset,
+        pt.size = 2)
 
-data_run_subset_label = data_run_subset_label[,Idents(data_run_subset_label) != 14]
+#data_run_subset_label = data_run_subset_label[,Idents(data_run_subset_label) != 14]
 plotAll(data_run_subset_label, folder = folder_subcluster,
         sample_name,sampleParam = NA,
         cell_features = cell_features,
-        label_TF = F,integrate_TF = F,  DE_perm_TF = F, 
-        clusterTF =F, markersTF = T,  
+        label_TF = F,integrate_TF = F,  DE_perm_TF = T, 
+        clusterTF =F, markersTF = F,  
         groupBy = groupBy_list, splitBy = splitBy_list,
-        PCA_dim = 30,resolution_val = resolution_val_subset, str = '_label')
+        PCA_dim = 30,resolution_val = resolution_val_subset, pt.size = 2,
+        str = '_label')
 
 
 PlotKnownMarkers(data_run_subset, folder = paste0(filepath_cluster,'Cell Type/'), 
                  cell_features = cell_features,
-                 plotType ='FeaturePlotFix' , str = '',plotTogether = F)
+                 plotType ='FeaturePlotFix' , str = '',markerSize = 1)
 
 stats_category = SummariseSampleByCell(data_run_subset_label)
 CompareCellNum(data_run_subset_label,stats_category,filepath_cluster,split_var = 'Treatment',metaData)
   
-cluster10 = Idents(data_run_subset)
-cluster10 = (cluster10[cluster10 == '10'])
-path  = paste0(filepath_cluster,'cluster10.csv')
-write.csv(names(cluster10), file = path,row.names=F)
+### Plot DE
 
-cluster_list = sort(unique(Idents(data_run_subset)))
+pathways.hallmark <- gmtPathways('/home/sujwary/Desktop/scRNA/Data/GSEA/h.all.v7.2.symbols.gmt')
+pathways.c2 <- gmtPathways('/home/sujwary/Desktop/scRNA/Data/GSEA/c2.all.v7.2.symbols.gmt')
+pathways.c5 <- gmtPathways('/home/sujwary/Desktop/scRNA/Data/GSEA/c5.all.v7.2.symbols.gmt')
+pathways.c7 <- gmtPathways('/home/sujwary/Desktop/scRNA/Data/GSEA/c7.all.v7.2.symbols.gmt')
+pathways.c8 <- gmtPathways('/home/sujwary/Desktop/scRNA/Data/GSEA/c8.all.v7.2.symbols.gmt')
+pathways = c(pathways.hallmark,pathways.c2,pathways.c5, pathways.c7,pathways.c8)
+
+
+filepath = paste0(filepath_cluster
+                  ,'Features',
+                  '.csv')
+DE = read.csv(file = filepath)
+cluster_list = unique(DE$cluster)
+str = ''
+DE = DE[DE$p_val_adj < 0.05,]
+DE = DE[!grepl("MT-", DE$gene),]
+DE = DE[!grepl(" ?RP\\w+ ?", DE$gene),]
+
+for (cluster in cluster_list){
+  DE_cluster = DE[DE$cluster == cluster,]
+  ranks <- DE_cluster$avg_logFC
+  names(ranks) <- DE_cluster$gene
+  
+  DE_cluster = DE_cluster[DE_cluster$avg_logFC > 0 ,]
+  
+  
+  
+  gene_list = DE_cluster
+  #gene_list = as.data.frame(as.character(gene_list[!is.na(gene_list)]))
+  #colnames(gene_list) = 'Markers'
+  
+  if (nrow(gene_list) > 3){
+    path = paste0(filepath_cluster,'DE/GSEA/')
+    dir.create(path,recursive = T)
+    path = paste0(path,cluster,'VsAll',str,'GSEA.csv')
+    
+    fgseaRes <- fgsea(pathways=pathways, stats=ranks, nperm=1000)
+    fgseaRes  = fgseaRes[order(fgseaRes$padj, fgseaRes$pval),]
+    fgseaRes$leadingEdge =  sapply( fgseaRes$leadingEdge , paste0, collapse=",")
+    write.csv(fgseaRes, file = path,row.names=F)
+    #next
+    
+    gene_list$Cell = cluster
+    gene_list$Plot_marker = 1
+    path = paste0(filepath_cluster,'DE/Cluster',cluster,'VsAll',str,'/')
+    PlotKnownMarkers(data_run_subset, 
+                     folder = path, 
+                     cell_features = gene_list,
+                     plotType ='FeaturePlotFix' , 
+                     prefix_logFC = T, str = '',markerSize = 1)
+  }
+  
+  
+}
+
+
+### Plot DE permutations
+data_input = data_run_subset_label
+cluster_list = sort(unique(Idents(data_input)))
 cluster1 = 23
-
+str = '_label'
+str = ''
 for (cluster1 in cluster_list){
   #
+  cluster1 = gsub("/", "", cluster1, fixed = T)
   filepath_mvn = paste0( filepath_cluster, 'DE/nVsm/')
   filepath = paste0(filepath_mvn
-                    ,'Features_',cluster1,'Vsn',
+                    ,'Features_',cluster1,'Vsn',str,
                     '.csv')
   DE_cluster = read.csv(file = filepath)
   
@@ -228,6 +330,7 @@ for (cluster1 in cluster_list){
     #data_cluster  = data_run_subset[, Idents(data_run_subset) == cluster]
     #print(cluster)
     #print(summary(data_cluster$origIdent))
+    cluster2 = gsub("/", "", cluster2, fixed = T)
     DE_cluster_m = DE_cluster[DE_cluster$ident_2 == cluster2,]
     DE_cluster_m = DE_cluster_m[order(-abs(DE_cluster_m$avg_logFC )),]
     DE_cluster_m = DE_cluster_m[DE_cluster_m$p_val_adj < 0.05 & DE_cluster_m$avg_logFC > 0 ,]
@@ -240,11 +343,11 @@ for (cluster1 in cluster_list){
     if (nrow(gene_list) > 0){
       gene_list$Cell = paste0(cluster1,'Vs',cluster2)
       gene_list$Plot_marker = 1
-      path = paste0(filepath_mvn,'FeaturePlot/Cluster',cluster1,'/')
-      PlotKnownMarkers(data_run_subset, 
+      path = paste0(filepath_mvn,'FeaturePlot/Cluster',cluster1,str,'/')
+      PlotKnownMarkers(data_input, 
                        folder = path, 
                        cell_features = gene_list,
-                       plotType ='FeaturePlotFix' , str = '',plotTogether = F)
+                       plotType ='FeaturePlotFix' , str = '',markerSize = 2)
     }
   }
   
@@ -653,12 +756,79 @@ write.table(data_matrix,
             quote=FALSE, sep='\t')
 
 # UmapCoord and metadata
+# metadata
 sample = as.character(data_run_subset_label$sample)
 ident = as.character(Idents(data_run_subset_label))
 UmapCoord = data_run_subset_label@reductions[["umap"]]@cell.embeddings
 
 output = cbind(sample,ident,UmapCoord)
+#output = data_run_subset_label@meta.data
 dir.create(paste0(filepath_cluster,'Data/'))
 path = paste0(filepath_cluster,'Data/Umap.csv')
 write.csv(output, file = path,row.names=TRUE,col.names=TRUE)
 
+
+## AUCell
+
+exprMatrix = data_run_subset@assays[["RNA"]]@counts
+
+library(AUCell)
+library(GSEABase)
+gmtFile <- paste0('/home/sujwary/Desktop/scRNA/Data/msigdb.v7.1.symbols.gmt')
+geneSets <- getGmt(gmtFile)
+
+cells_rankings <- AUCell_buildRankings(exprMatrix, nCores=1, plotStats=TRUE)
+cells_AUC <- AUCell_calcAUC(geneSets, cells_rankings)
+cells_assignment <- AUCell_exploreThresholds(cells_AUC, plotHist=F, assign=TRUE) 
+
+cells_assignment
+
+path = paste0(folder_subcluster,'cells_AUC','.Robj')
+save(cells_AUC,file= path)
+
+cellAssigned <- cells_assignment$Oligodendrocyte_Cahoy$assignment
+
+geneSetName <- rownames(cells_AUC)[grep("Oligodendrocyte_Cahoy", rownames(cells_AUC))]
+AUCell_plotHist(cells_AUC[geneSetName,], aucThr=0.25)
+abline(v=0.25)
+
+cellsAssigned <- lapply(cells_assignment, function(x) x$assignment)
+assignmentTable <- reshape2::melt(cellsAssigned, value.name="cell")
+colnames(assignmentTable)[2] <- "geneSet"
+head(assignmentTable)
+
+assignmentMat <- table(assignmentTable[,"geneSet"], assignmentTable[,"cell"])
+assignmentMat[,1:2]
+
+miniAssigMat <- assignmentMat[,sample(1:ncol(assignmentMat),100)]
+library(NMF)
+aheatmap(miniAssigMat, scale="none", color="black", legend=FALSE)
+
+
+## scVelo
+
+data_input = data_run_subset
+data_input = seurat[,!(Idents(data_input) %in% c(0,8,11,17,18,21,22))]
+data_input$sample_cell = paste0(data_input$Sample,'_', colnames(data_input))
+
+write.csv(unname(data_input$sample_cell), 
+          file = paste0(filepath_cluster,"Data/cellID_obs.csv"))
+write.csv(Embeddings(data_input, reduction = "umap"), 
+          file = paste0(filepath_cluster,"Data/cell_embeddings.csv"))
+write.csv(Idents(data_input), file = paste0(filepath_cluster,"Data/clusters.csv"))
+
+library(loomR)
+
+for(j in 1:ncol(data_input@meta.data)){
+  if(is.factor(data_input@meta.data[,j]) == T){
+    data_input@meta.data[,j] = as.character(data_input@meta.data[,j]) # Force the variable type to be character
+    data_input@meta.data[,j][is.na(data_input@meta.data[,j])] <- "NA"
+  }
+  if(is.character(data_input@meta.data[,j]) == T){
+    data_input@meta.data[,j][is.na(data_input@meta.data[,j])] <- "N.A"
+  }
+}
+meta_data = data_input@meta.data
+data_input@meta.data = meta_data[,c("orig.ident","nCount_RNA" ,"percent.mt" , "seurat_clusters")]
+pfile <- as.loom(data_input, filename = paste0(filepath_cluster,"Data/data.loom"), verbose = FALSE)
+ 

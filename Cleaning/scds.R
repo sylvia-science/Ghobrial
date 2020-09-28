@@ -17,7 +17,9 @@ source('/home/sujwary/Desktop/scRNA/Code/Functions.R')
 
 filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
 metaData = read_excel(filename_metaData)
-metaData = metaData[metaData$Run== 1,]
+#metaData = metaData[metaData$Run== 1,]
+metaData = metaData[metaData$`Sample Type` == 'PBMC',]
+metaData = metaData[rowSums(is.na(metaData)) != ncol(metaData), ]
 
 filename_sampleParam <- paste0('/home/sujwary/Desktop/scRNA/Data/sample','_parameters.xlsx')
 sampleParam <- read_excel(filename_sampleParam)
@@ -29,8 +31,8 @@ for (i in 1:nrow(metaData) ){
   percent_mt = sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
   
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/C100_Soup_MT/',sample_name,'/')
-  path = paste0(folder,'/',sample_name,'_data.Robj')
+  folder_output = paste0('/disk2/Projects/EloRD/Output/Soup_MT_C100/',sample_name,'/')
+  path = paste0(folder_output,'/',sample_name,'.Robj')
   data_i_run = loadRData(path)
   
   data_i_run_sc =  as.SingleCellExperiment(data_i_run)
@@ -45,12 +47,12 @@ for (i in 1:nrow(metaData) ){
   doublet_quantile_log =  quantile(doublet_log,0.925) 
   hist(doublet_log,breaks=20)
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_SCDS/',sample_name,'/')
-  dir.create(folder, recursive = T)
+  folder_output = paste0('/disk2/Projects/EloRD/Output/','Soup_MT_SCDS/',sample_name,'/')
+  dir.create(folder_output, recursive = T)
   scds_doublet = doublet_log > doublet_quantile_log
-  write.csv(scds_doublet, file=paste0(folder, 'Doublet','.csv'))
+  write.csv(scds_doublet, file=paste0(folder_output, 'Doublet','.csv'))
   
-  next
+  #next
   data_i_run$cxds_score = sce$cxds_score
   data_i_run$bcds_score = sce$bcds_score
   data_i_run$hybrid_score = sce$hybrid_score
@@ -63,30 +65,30 @@ for (i in 1:nrow(metaData) ){
   
   pt.size  = 0.8
   print('Plot')
-  pathName = paste0(folder,sample_name,'_Pre_Doublet_Umap','','.png')
+  pathName = paste0(folder_output,sample_name,'_Pre_Doublet_Umap','','.png')
   png(file=pathName,width=1000, height=1000)
   print(  DimPlot(data_i_run,pt.size = pt.size, reduction = "umap",label = FALSE))
   dev.off()
   
-  pathName = paste0(folder,sample_name,'_Pre_Doublet_Umap','_scds_doublet','.png')
+  pathName = paste0(folder_output,sample_name,'_Pre_Doublet_Umap','_scds_doublet','.png')
   png(file=pathName,width=1000, height=1000)
   print(  DimPlot(data_i_run,pt.size = pt.size, reduction = "umap",label = FALSE, group.by= 'scds_doublet' ))
   dev.off()
   
   
-  pathName = paste0(folder,sample_name,'_Pre_Doublet_Umap','hybrid_score','.png')
+  pathName = paste0(folder_output,sample_name,'_Pre_Doublet_Umap','hybrid_score','.png')
   png(file=pathName,width=1000, height=1000)
   print(FeaturePlot(data_i_run,pt.size =pt.size, features = c("hybrid_score")))
   dev.off()
   
   
-  pathName = paste0(folder,sample_name,'_Pre_Doublet_Umap','_percent.mt','.png')
+  pathName = paste0(folder_output,sample_name,'_Pre_Doublet_Umap','_percent.mt','.png')
   png(file=pathName,width=1000, height=1000)
   print(FeaturePlot(data_i_run,pt.size =pt.size, features = c("percent.mt")))
   dev.off()
   
   
-  pathName = paste0(folder,sample_name,'_Pre_Doublet_Umap','_nFeature_RNA','.png')
+  pathName = paste0(folder_output,sample_name,'_Pre_Doublet_Umap','_nFeature_RNA','.png')
   png(file=pathName,width=1000, height=1000)
   print(FeaturePlot(data_i_run,pt.size =pt.size, reduction = "umap", features = 'nFeature_RNA'))
   dev.off()
@@ -98,9 +100,9 @@ for (i in 1:nrow(metaData) ){
     gene = gene_list[j]
     print(gene)
     #browser()
-    folder = paste0('/home/sujwary/Desktop/scRNA/Output/SCDS/',sample_name,'/','Featureplots/Pre_Doublet_Umap/')
-    dir.create(folder,recursive = T)
-    plot = FeaturePlotFix(data_i_run, feature = gene, folder =folder,
+    folder_output = paste0('/disk2/Projects/EloRD/Output/Soup_MT_C100/',sample_name,'/','Featureplots/Pre_Doublet_Umap/')
+    dir.create(folder_output,recursive = T)
+    plot = FeaturePlotFix(data_i_run, feature = gene, folder =folder_output,
                           str = '',split = F, markerSize = 3,gene_TF = TRUE,title = '',saveTF = FALSE)
     plot = plot + theme(
       axis.title.x = element_text(color="black", size=24 ),
@@ -112,8 +114,8 @@ for (i in 1:nrow(metaData) ){
     )
     
     file_str = ''
-    pathName = paste0(folder,gene,file_str,'.png')
-    pathName = paste0(folder,gene,'','.png')
+    pathName = paste0(folder_output,gene,file_str,'.png')
+    pathName = paste0(folder_output,gene,'','.png')
     png(filename = pathName,width=2000, height=2000)
     print(plot)
     dev.off()

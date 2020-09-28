@@ -11,7 +11,10 @@ source('/home/sujwary/Desktop/scRNA/Code/Functions.R')
 
 filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
 metaData = read_excel(filename_metaData)
-metaData = metaData[metaData$Run== 1,]
+#metaData = metaData[metaData$Run== 1,]
+metaData = metaData[metaData$`Sample Type` == 'PBMC',]
+metaData = metaData[rowSums(is.na(metaData)) != ncol(metaData), ]
+
 
 filename_sampleParam <- paste0('/home/sujwary/Desktop/scRNA/Data/sample','_parameters.xlsx')
 sampleParam <- read_excel(filename_sampleParam)
@@ -22,37 +25,37 @@ i = 4
 
 #######################################
 # Soup + MT
-for (i in 1:nrow(metaData) ){
+for (i in 3:nrow(metaData) ){
+#for (i in 1 ){
   sample_name = metaData$Sample[i]
   print(sample_name)
   percent_mt = sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
   
 
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/C100_Soup_MT/',sample_name,'/')
-  path = paste0(folder,'/',sample_name,'_data.Robj')
+  folder = paste0('/disk2/Projects/EloRD/Output/Soup_MT_C100/',sample_name,'/')
+  path = paste0(folder,'/',sample_name,'.Robj')
   data_i_run = loadRData(path)
+
   
   folder_name = 'Soup_MT_DoubletFinder'
   
-  #sweep.res.list = paramSweep_v3(data_i_run, PCs = 1:30, sct = FALSE)
-  #sweep.stats = summarizeSweep(sweep.res.list, GT = FALSE)
-  #pK = find.pK(sweep.stats)
-  
-  #folder = paste0('/home/sujwary/Desktop/scRNA/Output/',folder_name,'/',sample_name,'/')
-  #dir.create(folder,recursive = T)
-  
-  
-  
-  
+  # sweep.res.list = paramSweep_v3(data_i_run, PCs = 1:10, sct = FALSE)
+  # sweep.stats = summarizeSweep(sweep.res.list, GT = FALSE)
+  # pK = find.pK(sweep.stats)
+  # 
+  # folder = paste0('/disk2/Projects/EloRD/Output/',folder_name,'/',sample_name,'/')
+  # dir.create(folder,recursive = T)
+  # 
   # pathName = paste0(folder,sample_name,'_Sweep_PK','','.png')
   # png(file=pathName,width=800, height=500)
   # plot = ggplot(data=pK, aes(x=pK, y=BCmetric, group = 1)) +
-  #   geom_line()+
-  #   geom_point()
-  # print(plot)
-  # dev.off()
+  #    geom_line()+
+  #    geom_point()
+  #  print(plot)
+  #  dev.off()
   #next
-  
+
+  #pk_val = pK
   pk_val = sampleParam$pk[sampleParam['Sample'] == sample_name]
   print(pk_val)
   nExp_poi <- round(0.075*length(colnames(data_i_run)))
@@ -62,13 +65,13 @@ for (i in 1:nrow(metaData) ){
   var = paste0('DF.classifications_',pn,'_',pk_val,'_',nExp_poi)
   
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/',folder_name,'/',sample_name,'/','pk_',pk_val,'/')
+  folder = paste0('/disk2/Projects/EloRD/Output/',folder_name,'/',sample_name,'/','pk_',pk_val,'/')
   dir.create(folder, recursive = T)
   doublet_data =data_i_run@meta.data[var]
   doublet_data = ifelse(doublet_data=='Doublet', T, F)
   write.csv(doublet_data, file=paste0(folder, 'Doublet',pk_val,'.csv'))
   
-  next
+  #next
   
   
   pt.size  = 0.8

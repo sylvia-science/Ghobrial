@@ -66,8 +66,8 @@ quality_control <- function(data,folder,filter,nFeature_RNA_list,percent_mt,samp
 visualize_PCA = function(data,folder,PCA_dim, reduction = 'pca'){
   print('Visualize PCA')
   #print(data[["pca"]], dims = 1:5, nfeatures = 5)
-  dir.create( paste0(folder,'PCA'), recursive = TRUE)
-  pathName <- paste0(folder,'PCA/DimLoading.png')
+  dir.create( paste0(folder,reduction), recursive = TRUE)
+  pathName <- paste0(folder,reduction,'/DimLoading.png')
   png(file=pathName,width=600, height=350)
   print(VizDimLoadings(data, dims = 1:2, reduction =reduction))
   dev.off()
@@ -87,7 +87,7 @@ visualize_PCA = function(data,folder,PCA_dim, reduction = 'pca'){
   
   for (i in 1:max_PC ){
     
-    pathName <- paste0(folder,paste0('PCA/',reduction,'_','DimHeatMap_',i,'.png'))
+    pathName <- paste0(folder,paste0(reduction,'/',reduction,'_','DimHeatMap_',i,'.png'))
     png(file=pathName,width=2000, height=1000, res=300)
     print(DimHeatmap(data, dims = i,reduction = reduction, cells = 500, balanced = TRUE))
     dev.off()
@@ -105,7 +105,7 @@ visualize_PCA = function(data,folder,PCA_dim, reduction = 'pca'){
   for (x in 1:(max_PC -1)){
     
     y <- x+1
-    pathName <- paste0(folder,'PCA/',reduction,x,'_',y,'.png')
+    pathName <- paste0(folder,reduction,'/',reduction,x,'_',y,'.png')
     png(file=pathName,width=600, height=350)
     print(DimPlot(data, dims = c(x,y), reduction = reduction,pt.size = 2))
     dev.off()
@@ -121,50 +121,25 @@ PlotKnownMarkers = function(data,
                             folder, 
                             cell_features,
                             plotType ='FeaturePlot',
-                            str = '', split_group = NA, plotTogether = T){
+                            prefix_logFC = F,str = '', split_group = NA, markerSize = 1){
   
   #browser()
   
   all_markers  = rownames(data@assays[["RNA"]])
   #all_markers = rownames(data)
   
+  
   #browser()
   dir.create( folder, recursive = TRUE)
   
-  feature_list = as.character(cell_features$Markers)
+  cell_features_plot = cell_features[cell_features$Plot_marker == 1,]
   
-  if ( plotType == 'FeaturePlotFix' & plotTogether == T){
-    gene_list = c()
-    for(i in 1:length(feature_list) ){
-      x = unlist(strsplit(feature_list[i], ",")) 
-      #x = gsub("\\s", "", x)  whitespace <- " \t\n\r\v\f"
-      x = trimws(x, which = c("both"), whitespace = " \t\n\r\v\f")
-      x = gsub("\\W", "", x)
-      gene_list = c(gene_list,x)
-    }
-    
-    gene_list = (gene_list[gene_list %in% all_markers])
-    gene_list = unique(gene_list)
-    
-    for (j in 1:length(gene_list)){
-      gene = gene_list[j]
-      print(gene)
-      #browser()
-      plot = FeaturePlotFix(data, feature = gene,folder = '',str = '', markerSize = 1,
-                            split = F, gene_TF = TRUE,title = '',saveTF = FALSE) 
-      pathName = paste0(folder,'gene','_',gene,str,'.png')
-      png(filename = pathName,width=1000, height=1000, res=100)
-      print(plot)
-      dev.off()
-      remove(plot)
-      
-    }
-    return 
-  }
+  feature_list = as.character(cell_features_plot$gene)
+
   
   for(i in 1:length(feature_list) ){
     #browser()
-    cell_type = cell_features$Cell[i]
+    cell_type = cell_features_plot$Cell[i]
     
     
     x = unlist(strsplit(feature_list[i], ",")) 
@@ -224,7 +199,7 @@ PlotKnownMarkers = function(data,
       print(plot)
       dev.off()
       
-    }else if (length(gene_list) > 0 & plotType == 'FeaturePlotFix'){
+    }else if (plotType == 'FeaturePlotFix' & length(gene_list) > 0 ){
       #browser()
       print(paste0( cell_type,': Found'))
       plot_list = vector('list',length(gene_list))
@@ -232,9 +207,17 @@ PlotKnownMarkers = function(data,
         gene = gene_list[j]
         print(gene)
         #browser()
-        plot = FeaturePlotFix(data, feature = gene,folder = '',str = '', markerSize = 1,
+        plot = FeaturePlotFix(data, feature = gene,folder = '',str = '', markerSize = markerSize,
                               split = F, gene_TF = TRUE,title = '',saveTF = FALSE) 
-        pathName = paste0(folder,cell_type,'_',gene,str,'.png')
+        #browser()
+        if (prefix_logFC){
+          
+          logFC = cell_features$avg_logFC[cell_features$gene==gene ]
+         
+          prefix = paste0('logFC_',  formatC(logFC, digits = 2, format = "f") ,'_')
+        }
+        
+        pathName = paste0(folder,prefix,cell_type,'_',gene,str,'.png')
         png(filename = pathName,width=1000, height=1000, res=100)
         print(plot)
         dev.off()

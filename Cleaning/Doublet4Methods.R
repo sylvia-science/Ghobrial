@@ -11,7 +11,9 @@ source('/home/sujwary/Desktop/scRNA/Code/Functions.R')
 
 filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
 metaData = read_excel(filename_metaData)
-metaData = metaData[metaData$Run== 1,]
+#metaData = metaData[metaData$Run== 1,]
+metaData = metaData[metaData$`Sample Type` == 'PBMC',]
+metaData = metaData[rowSums(is.na(metaData)) != ncol(metaData), ]
 
 filename_sampleParam <- paste0('/home/sujwary/Desktop/scRNA/Data/sample','_parameters.xlsx')
 sampleParam <- read_excel(filename_sampleParam)
@@ -21,30 +23,31 @@ sampleParam <- read_excel(filename_sampleParam)
 i = 1
 
 # Soup + MT + Doublet
-for (i in 1:nrow(metaData) ){
+for (i in 3:nrow(metaData) ){
   sample_name = metaData$Sample[i]
   print(sample_name)
   percent_mt = sampleParam$percent_mt_min[sampleParam['Sample'] == sample_name]
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/EmptyCells/',sample_name,'/')
-  br_e_sorted = read.csv(file = paste0(folder,'br_e_sorted_NFeatures100','.csv')) # empty cells
+  #folder = paste0('/home/sujwary/Desktop/scRNA/Output/EmptyCells/',sample_name,'/')
+  #br_e_sorted = read.csv(file = paste0(folder,'br_e_sorted_NFeatures100','.csv')) # empty cells
   
   threshold=  sampleParam$Scrublet_threshold[sampleParam['Sample'] == sample_name]
   
-  path = paste0('/home/sujwary/Desktop/scRNA/Output/Soup_MT_Scrublet/Umap Plots/',sample_name,'/', threshold,'/',sample_name,'_scrublet',threshold,'.csv')
+  path = paste0('/disk2/Projects/EloRD/Output/Soup_MT_Scrublet/Umap Plots/',sample_name,'/', threshold,'/',sample_name,'_scrublet',threshold,'.csv')
   scrb = read.csv(path,header = T)
   scrb$predicted_doublet = ifelse(scrb$predicted_doublet=='True', T, F)
   scrb$Scrublet_Boolean = ifelse(scrb$Scrublet_Boolean=='True', T, F)
   
+  
   pk_val = sampleParam$pk[sampleParam['Sample'] == sample_name]
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_DoubletFinder','/',sample_name,'/','pk_',pk_val,'/')
+  folder = paste0('/disk2/Projects/EloRD/Output/','Soup_MT_DoubletFinder','/',sample_name,'/','pk_',pk_val,'/')
   file=paste0(folder, 'Doublet',pk_val,'.csv')
   doublet_finder = read.csv(file)
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_scran_Doublet/',sample_name,'/')
+  folder = paste0('/disk2/Projects/EloRD/Output/','Soup_MT_scran_Doublet/',sample_name,'/')
   scran_doublet = read.csv(paste0(folder, 'Doublet','.csv'))
   
-  folder = paste0('/home/sujwary/Desktop/scRNA/Output/','Soup_MT_SCDS/',sample_name,'/')
+  folder = paste0('/disk2/Projects/EloRD/Output/','Soup_MT_SCDS/',sample_name,'/')
   scds_doublet = read.csv(paste0(folder, 'Doublet','.csv'))
   
   

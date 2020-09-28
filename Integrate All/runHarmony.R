@@ -36,7 +36,9 @@ cluster_id_param = read_excel(filename)
 
 filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
 metaData = read_excel(filename_metaData)
-metaData = metaData[metaData$Run== 1,]
+#metaData = metaData[metaData$Run== 1,]
+metaData = metaData[metaData$`Sample Type` == 'PBMC',]
+metaData = metaData[rowSums(is.na(metaData)) != ncol(metaData), ]
 
 sampleParam = sampleParam[sampleParam$Sample %in% metaData$Sample,]
 
@@ -48,6 +50,8 @@ downsample  = NA #downsample$x
 
 
 sample_type = 'Harmony_AllSamples_Sample_Kit'
+sample_type = 'Harmony_PBMC_Sample_Kit'
+
 PCA_dim = sampleParam_combine$PCA_dim[sampleParam_combine['Sample'] == sample_type]
 resolution_val = sampleParam_combine$resolution_val[sampleParam_combine['Sample'] == sample_type]
 cluster_IDs = sampleParam_combine$Cluster_IDs[sampleParam_combine['Sample'] == sample_type] 
@@ -63,11 +67,15 @@ Samples_runs = read_excel(filename_testIntRun)
 #folder = 'Intra-v3_1'
 #folder = 'Inter-version'
 folder_name = 'AllSamples'
+folder_name = 'PBMC'
+
 #folder_name = 'AllSamplesDownsample'
 #sample_list = Samples_runs$Samples[Samples_runs$Folder== folder]
 #sample_list = unlist(strsplit(sample_list, ",")) 
 #sample_list = trimws(sample_list, which = c("both"), whitespace = "[ \t\r\n]")
 sample_list = metaData$Sample
+
+sample_list = sample_list[c(1, 3:8)]
 
 folder = paste0('/home/sujwary/Desktop/scRNA/Output/Harmony/',folder_name,
                 '/Batch_Sample_Kit/','/')
@@ -84,10 +92,11 @@ if (run){
     #sample_name = sampleParam$Sample[i]
     sample_name = sample_list[i]
     print(sample_name)
-    folder_input = paste0('/home/sujwary/Desktop/scRNA/Output/Soup_MT_C100/', sample_name , '/')
+    folder_input = paste0('/disk2/Projects/EloRD/Output/Soup_MT_C100/', sample_name , '/')
     data_i = loadRData(paste0(folder_input,sample_name,'.Robj'))
     data_i$sample = sample_name
-    path = paste0('/home/sujwary/Desktop/scRNA/Output/TestNormalization/Soup_MT_C100/Scran/',sample_name,'/cellIdents.csv')
+
+    path = paste0('/disk2/Projects/EloRD/Output/TestNormalization/Soup_MT_C100/Scran/',sample_name,'/cellIdents.csv')
     cellIdents = read.csv(path,sep = ',',row.names = 1)
     cellIdents$x = paste0(cellIdents$x, ' S', i)
     data_i$CellType = cellIdents
@@ -106,8 +115,6 @@ if (run){
     
     print(ncol(data_i))
     if (ncol(data_i) > 100){
-    #if (T){
-      
       data_list[[i]] = data_i
       data_list_norm[[i]] = ScranNorm(data_i)
       
@@ -117,13 +124,6 @@ if (run){
   
   data_list_norm =data_list_norm[lengths(data_list_norm) != 0]
   data_merge = merge(x =  data_list_norm[[1]] ,y = data_list_norm[2:length(data_list_norm)], merge.data = T)
-  
-  #data_merge = merge(x =  data_list_norm[[1]],y = data_list_norm[[2]], merge.data = T)
-  #for (i in 3:length(data_list_norm)){
-  #  print(i)
-  #  data_merge = merge(x =  data_merge,y = data_list_norm[[i]],merge.data = T)
-  #}
-  
   
   data_merge = addMetaData(data_merge, metaData)
   data_merge = load_emptyDrops(data_merge)
@@ -231,11 +231,11 @@ featurePlot_list = c('percent.mt','nCount_RNA','G2M.Score','S.Score')
 splitBy_list = NA
 
 
-plotAll(data_merge_run, folder = folder,
+plotAll(data_merge_run, folder = folder, 
         sample_name,sampleParam = NA,
-        cell_features = cell_features,
+        cell_features = cell_features, plot_PCA = T,
         label_TF = F,integrate_TF = F,  DE_perm_TF = F, 
-        clusterTF =F, markersTF = T, keepOldLabels = T, 
+        clusterTF =F, markersTF = T,
         groupBy = groupBy_list, splitBy = splitBy_list,featurePlot_list = featurePlot_list,
         PCA_dim = 30,resolution_val = resolution_val)
 
@@ -282,6 +282,40 @@ plot = plot + theme(
 print(plot)
 
 dev.off()
+
+
+
+### Plot DE
+filepath = paste0(filepath_cluster
+                  ,'Features',
+                  '.csv')
+DE = read.csv(file = filepath)
+cluster_list = unique(DE$cluster)
+str = ''
+DE = DE[DE$p_val_adj < 0.05,]
+DE = DE[!grepl("MT-", DE$gene),]
+DE = DE[!grepl(" ?RP\\w+ ?", DE$gene),]
+
+for (cluster in cluster_list){
+  DE_cluster = DE[DE$cluster == cluster,]
+  DE_cluster = DE_cluster[DE_cluster$avg_logFC > 0 ,]
+  
+  
+  gene_list = DE_cluster$gene
+  gene_list = as.data.frame(as.character(gene_list[!is.na(gene_list)]))
+  colnames(gene_list) = 'Markers'
+  if (nrow(gene_list) > 0){
+    gene_list$Cell = cluster
+    gene_list$Plot_marker = 1
+    path = paste0(filepath_cluster,'FeaturePlot/Cluster',cluster,'VsAll',str,'/')
+    PlotKnownMarkers(data_merge_run, 
+                     folder = path, 
+                     cell_features = gene_list,
+                     plotType ='FeaturePlotFix' , str = '',plotTogether = F)
+  }
+  
+  
+}
 
 #######################
 ## DE

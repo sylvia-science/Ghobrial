@@ -1,7 +1,7 @@
 ############
 ## EdgeR
 ############
-runEdgeR = function(DE_input,design, contrast,folder_output, subfolder){
+runEdgeR = function(DE_input,design, contrast,keep,folder_output, subfolder){
   #browser()
   
   base = paste0(folder_output, 'DE/','EdgeR/',subfolder,'/')
@@ -9,16 +9,20 @@ runEdgeR = function(DE_input,design, contrast,folder_output, subfolder){
   
   dge <- DGEList(DE_input@assays[["RNA"]]@counts, 
                  group = DE_input$DE_ident) 
-  countpergene <- rowMeans(dge$counts)
-  isexpr = countpergene > 0.02
+  countpergene_mean <- rowMeans(dge$counts)
+  
+  isexpr = countpergene_mean > 0.02
 
   pathName <- paste0(base,'CountPerGeneHist','.png')
   png(file=pathName,width=500, height=500,res = 100)
-  hist(log10(countpergene), breaks=100, main="", col="grey",xlab=expression('log10 Counts per gene'))
+  hist(log10(countpergene_mean), breaks=100, main="", col="grey",xlab=expression('log10 Counts per gene'))
   abline(v=log10(0.02), col="blue", lwd=2, lty=2)
   dev.off()
 
-  dge = dge[isexpr,]
+  sum(keep)
+  sum(isexpr)
+  
+  dge = dge[keep,]
 
   dge <- calcNormFactors(dge)
   dge <- estimateDisp(dge, design = design,robust=F)
@@ -39,7 +43,7 @@ runEdgeR = function(DE_input,design, contrast,folder_output, subfolder){
   # sum(res_batch$FDR > 0.05)
   
   #browser()
-  res <- topTags(qlf, n = Inf)
+  res <- topTags(qlf, n = Inf, adjust.method = "BH")
   res = res$table
   res = res[order(-res$logFC),]
   res[1:20,]
@@ -110,14 +114,14 @@ plotEdgeR = function(dge_edgeR, DE_ident,qlf,base, subfolder){
 ## MAST
 ############
 
-runMAST= function(DE_input,formula,ident_list , ident, folder_output,subfolder){
+runMAST= function(DE_input,formula,ident_list , ident, keep, folder_output,subfolder){
   library(rsvd)
   library(data.table)
   library(GGally)
   base = paste0(folder_output, 'DE/','MAST/',subfolder,'/')
   dir.create(base,recursive = T)
   
-  browser()
+  #browser()
   dge <- DGEList(DE_input@assays[["RNA"]]@counts , 
                  group = DE_input$DE_ident)
   
@@ -130,7 +134,9 @@ runMAST= function(DE_input,formula,ident_list , ident, folder_output,subfolder){
   abline(v=log10(0.02), col="blue", lwd=2, lty=2)
   dev.off()
   
-  dge = dge[isexpr,]
+
+  
+  dge = dge[keep,]
   
   
   
@@ -152,7 +158,7 @@ runMAST= function(DE_input,formula,ident_list , ident, folder_output,subfolder){
   
   fcHurdle = summaryDt[contrast== paste0('DE_ident',ident),]
   fcHurdle = fcHurdle[component=='H',]
-  fcHurdle$FDR = p.adjust(fcHurdle$`Pr(>Chisq)`)
+  fcHurdle$FDR = p.adjust(fcHurdle$`Pr(>Chisq)`, method = "BH")
   fcHurdle = fcHurdle[order(fcHurdle$FDR),]
 
   
@@ -164,9 +170,9 @@ runMAST= function(DE_input,formula,ident_list , ident, folder_output,subfolder){
   
   path = paste0(base,'summaryCond','.Robj')
   save(summaryCond,file= path)
-  summaryCond = loadRData(path)
+  #summaryCond = loadRData(path)
   
-  path = paste0(base,'fcHurdle','csv')
+  path = paste0(base,'fcHurdle','.csv')
   write.csv(fcHurdle, file = path,row.names=TRUE)
   
   output <- list(dge,summaryCond, fcHurdle)
@@ -192,7 +198,7 @@ plotPCAMast <- function(sca_obj, base){
 ## VoomLimma
 ############
 
-runVoomLimma= function(DE_input,design,contrast, folder_output, subfolder){
+runVoomLimma= function(DE_input,design,contrast, keep, folder_output, subfolder){
   #browser()
   base = paste0(folder_output, 'DE/','VoomLimma/',subfolder,'/')
   dir.create(base,recursive = T)
@@ -210,7 +216,7 @@ runVoomLimma= function(DE_input,design,contrast, folder_output, subfolder){
   abline(v=log10(0.02), col="blue", lwd=2, lty=2)
   dev.off()
   
-  dge = dge[isexpr,]
+  dge = dge[keep,]
   
   
   dge <- calcNormFactors(dge)
@@ -255,8 +261,8 @@ runVoomLimma= function(DE_input,design,contrast, folder_output, subfolder){
 ## DESeq2
 ############
   
-runDESeq2= function(DE_input,design,contrast, folder_output, subfolder){
-  browser()
+runDESeq2= function(DE_input,design,contrast, keep, folder_output, subfolder){
+  #browser()
   base = paste0(folder_output, 'DE/','DESeq2/',subfolder,'/')
   dir.create(base,recursive = T)
   
@@ -269,13 +275,14 @@ runDESeq2= function(DE_input,design,contrast, folder_output, subfolder){
   countpergene <- rowMeans(counts)
   isexpr = countpergene > 0.02
   
+  
   pathName <- paste0(base,'CountPerGeneHist','.png')
   png(file=pathName,width=500, height=500,res = 100)
   hist(log10(countpergene), breaks=100, main="", col="grey",xlab=expression('log10 Counts per gene'))
   abline(v=log10(0.02), col="blue", lwd=2, lty=2)
   dev.off()
   
-  dds = dds[isexpr,]
+  dds = dds[keep,]
   
   run_rlog = F
   if (run_rlog){
@@ -294,7 +301,7 @@ runDESeq2= function(DE_input,design,contrast, folder_output, subfolder){
   
   res <- results(dds, 
                  contrast = contrast,
-                 alpha = 0.05)
+                 alpha = 0.05,  pAdjustMethod	 ='BH')
   
   res <- lfcShrink(dds,type ='ashr',contrast =  contrast,res=res)
   
@@ -322,7 +329,7 @@ runDESeq2= function(DE_input,design,contrast, folder_output, subfolder){
           axis.title = element_text(size = rel(1.25)))
   dev.off()
   
-  path = paste0(base, 'DE_EdgeR ',ident1,' Vs ', ident2,'.csv')
+  path = paste0(base, 'DE_DESeq2 ',ident1,' Vs ', ident2,'.csv')
   print(path)
   write.csv(res, file = path,row.names=TRUE)
   

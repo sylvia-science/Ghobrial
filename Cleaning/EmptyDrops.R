@@ -11,7 +11,9 @@ source('/home/sujwary/Desktop/scRNA/Code/Functions.R')
 
 filename_metaData = '/home/sujwary/Desktop/scRNA/Data/EloRD Meta.xlsx'
 metaData = read_excel(filename_metaData)
-metaData = metaData[metaData$Run== 1,]
+#metaData = metaData[metaData$Run== 1,]
+metaData = metaData[metaData$`Sample Type` == 'PBMC',]
+metaData = metaData[rowSums(is.na(metaData)) != ncol(metaData), ]
 
 filename_sampleParam <- paste0('/home/sujwary/Desktop/scRNA/Data/sample','_parameters.xlsx')
 sampleParam <- read_excel(filename_sampleParam)
@@ -20,20 +22,20 @@ sampleParam <- read_excel(filename_sampleParam)
 for (i in 1:nrow(metaData) ){
   sample_name = metaData$Sample[i]
   print(sample_name)
-  Scrublet_threshold = sampleParam$Scrublet_threshold[sampleParam['Sample'] == sample_name]
-  print(Scrublet_threshold)
+  #Scrublet_threshold = sampleParam$Scrublet_threshold[sampleParam['Sample'] == sample_name]
+  #print(Scrublet_threshold)
   
   filename = paste("/home/sujwary/Desktop/scRNA/Data/",sample_name,"_raw_feature_bc_matrix.h5",sep = "")
   data_i_raw = Read10X_h5(filename, use.names = TRUE, unique.features = TRUE)
   data_i_raw = CreateSeuratObject(counts = data_i_raw, project = "BM", min.cells = 3, min.features = 1)
   
-  #colSum_list = colSums(data_i_raw ) # Needs to be from Matrix library
-  #keep = colSum_list >= 100
-  #data_i_filtered = data_i_raw[,keep]
+  colSum_list = colSums(data_i_raw ) # Needs to be from Matrix library
+  keep = colSum_list >= 100
+  data_i_filtered = data_i_raw[,keep]
   
   
-  row_val = rownames(data_i_filtered)
-  col_val = colnames(data_i_filtered)
+  #row_val = rownames(data_i_filtered)
+  #col_val = colnames(data_i_filtered)
   
   ## Empty drops
   counts= data_i_raw@assays[["RNA"]]@counts
